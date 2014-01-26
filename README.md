@@ -22,10 +22,10 @@ Getting started
 
 * Make sure you are on a Linux machine
 * If you are using canvas, create a file named ".canvas-token" in your home directory that contains:
- ```
- self.CANVAS_API="https://canvas.instructure.com/api/v1/"
- self.CANVAS_TOKEN="token-generated-in-canvas"
-```
+
+    self.CANVAS_API="https://canvas.instructure.com/api/v1/"
+    self.CANVAS_TOKEN="token-generated-in-canvas"
+
 
 The first line should be the URL for the Canvas API. For Michigan Tech, for example, this URL should be "https://mtu.instructure.com/api/v1". The second line should contain a token that you must generate in Canvas and will be a string of characters and numbers. To generate one, login to Canvas, go to "Settings" and click on the "New Access Token" button.
 

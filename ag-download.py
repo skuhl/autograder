@@ -29,5 +29,5 @@ print("Any existing submissions in the \""+subdirName+"\" directory will be over
 yn = sys.stdin.readline()
 
 # Download the assignments from Canvas.
-c = canvas.canvas()
+c = canvas.Canvas()
 c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName)

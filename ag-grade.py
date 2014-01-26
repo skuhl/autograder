@@ -45,12 +45,15 @@ for thisDir in dirs:
     ag = autograder.autograder("AUTOGRADE.txt", thisDir)
 
     # Verify that the files are there that we are expecting and look for unexpected files.
-    ag.expect_only_files(["makefile", "Makefile", "mtusort.c", "mtusort.h", "README", "README.txt", "AUTOGRADE*.txt"])
+    ag.expect_only_files(["makefile", "Makefile", "*.c", "*.h", "README", "README.txt", "AUTOGRADE*.txt"])
     ag.find_unexpected_subdirectories([])
     ag.expect_file_one_of(["*.c", "*.C"], 1)
     ag.expect_file_one_of(["makefile", "Makefile"], 5)
 
     exe=[ 'mtusort' ] # a list of executables we are expecting
+    # Delete any executables the student might have submitted---we will compile them ourselves.
+    for f in exe:
+        ag.delete(f)
     # run 'make' in the students directory
     ag.run_expectExitCode(["make"], expectExitCode=0, deductWrongExit=5, timeout=30)
     ag.expect_file_all_of(exe, 5) # check that exe got created

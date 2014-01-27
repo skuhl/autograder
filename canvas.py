@@ -168,7 +168,11 @@ class Canvas():
         for studentSubmit in submissions:
             newestOnTimeAttempt = 0
             newestOnTimeSubmission = None
-            allHistory = studentSubmit['submissions'][0]['submission_history']
+            if len(studentSubmit['submissions']) > 0:
+                allHistory = studentSubmit['submissions'][0]['submission_history']
+            else:
+                allHistory = []
+            
 
             for hist in allHistory:
                 # hist['attempt'] is actually set to null if we have already
@@ -226,7 +230,8 @@ class Canvas():
             os.makedirs(dir)
         # require one attachment
         for i in submissions:
-            if 'attachments' in i and \
+            if i != None and \
+               'attachments' in i and \
                len(i['attachments']) == 1 and \
                i['attachments'][0]['url'] and \
                i['attachments'][0]['filename']:
@@ -325,6 +330,7 @@ class Canvas():
         assignmentId = self.findAssignmentId(assignments, assignmentName)
         submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId)
         submissionsToGrade = self.findSubmissionsToGrade(submissions)
+        print(submissionsToGrade)
         self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)
         if subdirName:
             self.extractAllFiles(dir=subdirName,newSubdir=True)

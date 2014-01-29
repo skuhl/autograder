@@ -282,7 +282,7 @@ class Canvas():
             os.remove(filename)
         import zipfile
         if zipfile.is_zipfile(filename):
-            zip = zipfile.open(filename)
+            zip = zipfile.ZipFile(filename)
             zip.extractall(path=destDir)
             zip.close()
             os.remove(filename)

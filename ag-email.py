@@ -17,7 +17,7 @@ def emailLogin(senderEmail, mypassword):
     emailSession.ehlo()
     emailSession.starttls()
     emailSession.ehlo
-    emailSession.login(sender, mypassword)
+    emailSession.login(senderEmail, mypassword)
 
 def emailLogout():
     global emailSession
@@ -26,14 +26,14 @@ def emailLogout():
 def emailStudent(senderEmail, studentUsername, subject, text):
     recipients = [ studentUsername + "@" + domain ]   # list of recipients
     body = text  # body of message
-    headers = ["From: " + sender,
+    headers = ["From: " + senderEmail,
                "Subject: " + subject,
                "To: " + ', '.join(recipients),
                "MIME-Version: 1.0",
                "Content-Type: text/plain"]
     headers = "\r\n".join(headers)
     global emailSession
-    emailSession.sendmail(sender, recipients, headers + "\r\n\r\n" + body)
+    emailSession.sendmail(senderEmail, recipients, headers + "\r\n\r\n" + body)
 
 
 import sys
@@ -55,7 +55,7 @@ dirs.sort()
 
 errorOccured = False
 for thisDir in dirs:
-    if not os.path.exists(thisDir + "AUTOGRADE.txt"):
+    if not os.path.exists(thisDir + "/AUTOGRADE.txt"):
         print("ERROR: No AUTOGRADE.txt file to send to "+thisDir+"@"+domain)
         errorOccured = True
 if errorOccured:
@@ -68,16 +68,18 @@ subject = sys.stdin.readline().strip()
 
 # Login to email server
 senderEmail = getpass.getuser() + '@' + domain
-mypassword = getpass.getpass("Password for " + sender + ": ")
+mypassword = getpass.getpass("Password for " + senderEmail + ": ")
 emailLogin(senderEmail, mypassword)
 
 
 
 # send email messages
 for thisDir in dirs:
-    if os.path.exists(thisDir + "AUTOGRADE.txt"):
+    if os.path.exists(thisDir + "/AUTOGRADE.txt"):
         print("Sending message to: "+thisDir+"@"+domain)
-#        emailStudent(senderEmail, thisDir, subject, "This is a test message")
+        with open(thisDir + "/AUTOGRADE.txt", 'r') as content_file:
+            content = content_file.read()
+        emailStudent(senderEmail, thisDir, subject, content)
     else:
         print("Skipping: "+thisDir+"@"+domain + "(no AUTOGRADE.txt file)")
 

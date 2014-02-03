@@ -117,7 +117,7 @@ class autograder():
     def __init__(self, logFile, directory, totalPoints=100):
         self.origwd = os.getcwd()
         self.logPointsTotal = 100
-        self.logFile = self.origwd + "/" + logFile
+        self.logFile = os.path.join(self.origwd, logFile)
         self.directory = directory
         self.pristineDirectory = "/tmp/autograde-" + directory
 
@@ -135,13 +135,32 @@ class autograder():
             shutil.rmtree(self.pristineDirectory)
         shutil.copytree(self.directory, self.pristineDirectory)
 
-        # Appends a new entry into the log file indicating that we went into a subdirectory.
+        # Print a header for this student to the console and log file.
         os.chdir(directory)
         with open(self.logFile, "a") as myfile:
-            msg = "=== " + directory + "\n"
-            myfile.write("\n\n\n"+msg)
+            msg = "=== " + directory
+            myfile.write(msg + "\n")
+            print("#######################################")
+            print("#######################################")
+            print("#######################################")
             print(bcolors.BOLD + msg + bcolors.ENDC)
             myfile.close()
+
+        # Adjust grade based on the contents of AUTOGRADE-MANUAL.txt
+        # that the teacher may have added to the directory. This file
+        # will contain the number of points to deduct, a space, and
+        # then a description of what to deduct.
+        manAgFile = "AUTOGRADE-MANUAL.txt"
+        print(manAgFile)
+        if os.path.exists(manAgFile):
+            print("autograde manual file exists")
+            with open(manAgFile, "r") as manFile:
+                manFileContents = manFile.read()
+                manualScore = int(manFileContents.split(' ')[0])
+                manualLabel = ' '.join(manFileContents.split(' ')[1:])
+                self.log_addEntry(manualLabel.strip(), manualScore)
+
+
 
     def cleanup(self):
         self.pristine()
@@ -278,7 +297,7 @@ class autograder():
         self.log_addEntry("There shouldn't be any of these files in the directory: " + str(wrongFiles))
         for f in wrongFiles:
             for g in glob.glob(f):
-                self.log_addEntry("This file shouldn't exist now: " + g, deductPoints)
+                self.log_addEntry("This file shouldn't exist: " + g, deductPoints)
         
 
     def find_unexpected_subdirectories(self, expected_dirs, deductPoints = 0):

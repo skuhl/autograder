@@ -35,6 +35,7 @@ c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdi
 # Look for ELF executables the user might have submitted and remove them!
 for dirpath, dnames, fnames in os.walk(subdirName):
     for f in fnames:            # for each file in tree
+        f = os.path.join(dirpath, f)
         if os.path.isfile(f):   # check that it is a file
             with open(f, "rb") as fileBytes:  # open the file
                 magic = fileBytes.read(4)     # read 4 bytes

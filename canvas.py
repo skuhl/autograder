@@ -177,7 +177,7 @@ class Canvas():
             for hist in allHistory:
                 # hist['attempt'] is actually set to null if we have already
                 # graded something that hasn't been submitted.
-                if not hist['late'] and hist['attempt'] and hist['attempt'] > newestOnTimeAttempt:
+                if not hist['late'] and hist['attempt'] and hist['attempt'] >= newestOnTimeAttempt:
                     newestOnTimeAttempt = hist['attempt']
                     newestOnTimeSubmission = hist
 
@@ -191,8 +191,8 @@ class Canvas():
 
             # If there was no submission, a submission object for the
             # student will be returned that has 'attempt: null'.
-            if not newestOnTimeSubmission and len(allHistory) > 0:
-                newestOnTimeSubmission = allHistory[0]
+            #if not newestOnTimeSubmission and len(allHistory) > 0:
+            #    newestOnTimeSubmission = allHistory[0]
             goodSubmissions.append(newestOnTimeSubmission)
         return goodSubmissions
 
@@ -241,8 +241,8 @@ class Canvas():
                 exten = os.path.splitext(filename)[1] # get filename extension
                 message = student['name'] + " ("+student['login_id']+")"
 
-                archiveFile  = dir+"/"+student['login_id']+exten
-                subdirName   = dir+"/"+student['login_id']
+                archiveFile  = os.path.join(dir,student['login_id']+exten)
+                subdirName   = os.path.join(dir,student['login_id'])
                 # Always delete existing stuff.
                 if os.path.exists(archiveFile):
                     os.unlink(archiveFile)

@@ -303,7 +303,7 @@ class Canvas():
 
     def printCourseIds(self, courses):
         for i in courses:
-            print("%10s %s"%(str(i['id']), i['name']))
+            print("%10s \"%s\""%(str(i['id']), i['name']))
 
     def printAssignmentIds(self, assignments):
         for i in assignments:

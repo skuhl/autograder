@@ -54,6 +54,7 @@ class Command(object):
             limitString += "fsize="  + autogradeobj.humanSize(int(os.environ["ULIMIT_FSIZE"])) + " "
             autogradeobj.log_addEntry(limitString)
             startTime = time.time()
+            
             try:
             # write stderr/stdout to temp file in case students print tons of stuff out.
                 with open("AUTOGRADE-STDOUT-TEMP-FILE.txt", 'w') as fo:
@@ -81,6 +82,7 @@ class Command(object):
             else:
                 autogradeobj.log_addEntry('Process manager: Process exited after ' + elapsedTime + ' with return code ' + str(self.retcode))
 
+
         thread = threading.Thread(target=target)
         thread.start()
 
@@ -94,7 +96,7 @@ class Command(object):
             raise
 
         if thread.is_alive():
-            autogradeobj.log_addEntry('Process manager: Ran for more than ' + str(timeout) + ' seconds. Terminating process')
+            autogradeobj.log_addEntry('Process manager: Ran for more than ' + str(timeout) + ' seconds. Terminating process...')
             self.tooSlow = True
             while thread.isAlive() and self.process != None:
                 try:
@@ -151,9 +153,7 @@ class autograder():
         # will contain the number of points to deduct, a space, and
         # then a description of what to deduct.
         manAgFile = "AUTOGRADE-MANUAL.txt"
-        print(manAgFile)
         if os.path.exists(manAgFile):
-            print("autograde manual file exists")
             with open(manAgFile, "r") as manFile:
                 manFileContents = manFile.read()
                 manualScore = int(manFileContents.split(' ')[0])
@@ -168,6 +168,8 @@ class autograder():
         os.chdir(self.origwd)
         # Appends the student's total score to the log file.
         msg = "TOTAL (instructor/TA/grader may adjust it!): " + str(self.logPointsTotal) + "\n"
+        if self.logPointsTotal < 0:
+            msg = msg + "Ouch! That score is less than 0! This can happen because the autograder starts by giving everybody 100 points and then deducts points for any problem it sees (this approach is not perfect). We won't give you a score less than 0. If there is a simple change that makes your program work correctly, the instructor/TA/grader might give you a much, much higher score.\n"
         with open(self.logFile, "a") as myfile:
             myfile.write(msg)
             myfile.close()
@@ -223,11 +225,12 @@ class autograder():
         if not os.path.exists(filename):
             return "Can't read from " + filename + " because it doesn't exist."
 
-        with open(filename, 'r') as f:
+        with open(filename, 'r', encoding="ascii", errors='replace') as f:
             if os.path.getsize(filename) > 10000:
                 retstring = f.read(4000)
-                retstring += "\n\nSNIP SNIP SNIP\n\n"
-                f.seek(-4000, os.SEEK_END)
+                retstring += "\n\nSNIP SNIP SNIP (leaving out some of the output!)\n\n"
+                # f.seek(-4000, os.SEEK_END)
+                f.seek(os.path.getsize(filename)-4000)
                 retstring += f.read(4000)
             else:
                 retstring = f.read()
@@ -324,6 +327,12 @@ class autograder():
     def log_addEntry(self, msg, pointsDeducted=0):
         """Appends a entry into a log file. If pointsDeducted is set, points will be removed from the students grade and mentioned in the log file."""
         # Make sure pointsDeducted is a negative number!
+        if msg.startswith('==='):
+            self.log_and_print("=================================================================")
+            msg = msg.replace('===', '')
+            self.log_and_print(msg)
+            self.log_and_print("=================================================================")
+            return
         msg = self.asciistring(msg)
         if pointsDeducted > 0:
             pointsDeducted = -pointsDeducted
@@ -453,13 +462,13 @@ class autograder():
                 return True
 
 
-    def file_must_contain(self, filename, string, deductPoints):
+    def file_must_contain(self, filename, string, deductPoints=0):
         """The file "filename" should contain the string "string". If it doesn't, deduct points."""
         self.log_addEntry("Checking that '" + str(string) + "' is somewhere in '" + filename + "'.")
         with open(filename, "r") as myfile:
             data = myfile.read()
             if string not in data:
-                self.log_addEntry("The string " + str(string) + " is not in " + str(filename), -5)
+                self.log_addEntry("The string " + str(string) + " is not in " + str(filename), deductPoints)
 
     def humanSize(self, num):
         for x in ['bytes','KiB','MiB','GiB','TiB']:

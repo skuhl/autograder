@@ -36,20 +36,20 @@ class Command(object):
         nproc = int(os.environ["ULIMIT_NPROC"])
         data = int(os.environ["ULIMIT_DATA"])
         fsize = int(os.environ["ULIMIT_FSIZE"])
-        resource.setrlimit(resource.RLIMIT_NPROC, (nproc,nproc)); # number of processes
+        resource.setrlimit(resource.RLIMIT_NPROC, (nproc,nproc));
         resource.setrlimit(resource.RLIMIT_AS, (data,data));
         resource.setrlimit(resource.RLIMIT_FSIZE, (fsize,fsize));
 
 
     def run(self, autogradeobj, timeout=5, stdindata=None):
         def target():
-            os.environ["ULIMIT_NPROC"] = str(512)              # Maximum number of processes
+            # To print current number of used processes, run: ps -eLF | grep $USER | wc -l
+            os.environ["ULIMIT_NPROC"] = str(1024*4)            # Maximum number of processes
             os.environ["ULIMIT_DATA"]  = str(1024*1024*1024*8)  # 8 GB of space memory
             os.environ["ULIMIT_FSIZE"] = str(1024*1024*1024*50) # 50 GB of space for files
             autogradeobj.log_addEntry('Process manager: Thread started: '+str(self.cmd))
             limitString  = "Process manager: Limits are "
             limitString += "time="  + str(timeout) + "sec "
-            limitString += "nproc="  + os.environ["ULIMIT_NPROC"] + " "
             limitString += "memory=" + autogradeobj.humanSize(int(os.environ["ULIMIT_DATA"]))  + " "
             limitString += "fsize="  + autogradeobj.humanSize(int(os.environ["ULIMIT_FSIZE"])) + " "
             autogradeobj.log_addEntry(limitString)

@@ -24,9 +24,11 @@ subdirName = sys.stdin.readline().strip()
 
 if not os.path.exists(subdirName):
     os.mkdir(subdirName)
-
-print("Any existing submissions in the \""+subdirName+"\" directory will be overwritten. Press Ctrl+C to exit, any other key to continue.")
-yn = sys.stdin.readline()
+else:
+    print("Directory exists.")
+    print("Submissions in \""+subdirName+"\" will be overwritten.")
+    print("Press Ctrl+C to exit, any other key to continue.")
+    yn = sys.stdin.readline()
 
 # Download the assignments from Canvas.
 c = canvas.Canvas()

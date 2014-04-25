@@ -67,7 +67,23 @@ class Canvas():
 
     def getCourses(self):
         """Gets course objects"""
-        return self.makeRequest("courses")
+        per_page=100
+        page=1
+
+        # Get first page of responses
+        subsetCourses = self.makeRequest("courses?per_page="+str(per_page)+"&page="+str(page))
+        allCourses = subsetCourses
+        page=page+1
+
+        # While pages are full, get more pages
+        while len(subsetCourses) == per_page:
+            subsetCourses = self.makeRequest("courses?per_page="+str(per_page)+"&page="+str(page))
+            #print("courses on page: " + str(len(subsetCourses)))
+            allCourses.extend(subsetCourses)
+            page=page+1
+
+        return allCourses
+
 
     def getStudents(self, courseId=None):
         """Gets list of students in a course."""

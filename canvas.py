@@ -238,6 +238,31 @@ class Canvas():
                     graded = str(hist['grade'])
                 print(fmtStr%(graded, late, str(hist['attempt']), str(student['login_id']), student['name']))
 
+
+    def prettyDate(self, d):
+        import datetime
+        diff = datetime.datetime.utcnow() - d
+        s = diff.seconds
+        if diff.days > 7 or diff.days < 0:
+            return d.strftime('%Y-%m-%d')
+        elif diff.days == 1:
+            return '1 day ago'
+        elif diff.days > 1:
+            return '{:d} days ago'.format(int(diff.days))
+        elif s <= 1:
+            return 'just now'
+        elif s < 60:
+            return '{:d} seconds ago'.format(int(s))
+        elif s < 120:
+            return '1 minute ago'
+        elif s < 3600:
+            return '{:d} minutes ago'.format(int(s/60))
+        elif s < 7200:
+            return '1 hour ago'
+        else:
+            return '{:d} hours ago'.format(int(s/3600))
+
+                
     def downloadSubmissions(self, submissions, students, dir="None"):
         """Assumes that students submit one file (tgz.gz, zip, whatever is allowed) and downloads it into the given subdirectory."""
         if not dir:
@@ -255,7 +280,8 @@ class Canvas():
                 attachment = i['attachments'][0]
                 filename = attachment['filename']
                 exten = os.path.splitext(filename)[1] # get filename extension
-                message = student['name'] + " ("+student['login_id']+")"
+                import datetime
+                d = datetime.datetime.strptime(i['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
 
                 archiveFile  = os.path.join(dir,student['login_id']+exten)
                 subdirName   = os.path.join(dir,student['login_id'])
@@ -265,7 +291,7 @@ class Canvas():
                 if os.path.exists(subdirName):
                     shutil.rmtree(subdirName)
 
-                print("Downloading file for " + message)
+                print(student['name'] + " ("+student['login_id']+") submitted " + self.prettyDate(d))
                 urllib.request.urlretrieve(attachment['url'], dir+"/"+student['login_id']+exten)
 
 
@@ -346,7 +372,7 @@ class Canvas():
         assignmentId = self.findAssignmentId(assignments, assignmentName)
         submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId)
         submissionsToGrade = self.findSubmissionsToGrade(submissions)
-        print(submissionsToGrade)
+        # print(submissionsToGrade)
         self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)
         if subdirName:
             self.extractAllFiles(dir=subdirName,newSubdir=True)

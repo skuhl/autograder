@@ -41,7 +41,7 @@ class Command(object):
         resource.setrlimit(resource.RLIMIT_FSIZE, (fsize,fsize));
 
 
-    def run(self, autogradeobj, timeout=5, stdindata=None):
+    def run(self, autogradeobj, timeout=5, stdindata=None, workToDoWhileRunning=None):
         def target():
             # To print current number of used processes, run: ps -eLF | grep $USER | wc -l
             os.environ["ULIMIT_NPROC"] = str(1024*4)            # Maximum number of processes
@@ -85,7 +85,9 @@ class Command(object):
 
         thread = threading.Thread(target=target)
         thread.start()
-
+        time.sleep(.5)
+        if workToDoWhileRunning:
+            workToDoWhileRunning()
         try:
             thread.join(timeout)
         # Without this, Ctrl+C will cause python to exit---but we will
@@ -364,10 +366,10 @@ class autograder():
         return newstr.replace('\r', '');
 
 
-    def run(self, exe, timeout=5, stdindata=None, deductTimeout=0, deductSegfault=0, quiet=False):
+    def run(self, exe, timeout=5, stdindata=None, deductTimeout=0, deductSegfault=0, quiet=False, workToDoWhileRunning=None):
         """Runs exe for up to timeout seconds. stdindata is sent to the process on stdin. deductTimeout points are deducted if the process does not finish before the timeout. deductSegfault points are deducted if the program segfaults."""
         cmd = Command(exe)
-        (didRun, tooSlow, retcode, stdoutdata, stderrdata) = cmd.run(self, timeout=timeout, stdindata=stdindata)
+        (didRun, tooSlow, retcode, stdoutdata, stderrdata) = cmd.run(self, timeout=timeout, stdindata=stdindata, workToDoWhileRunning=workToDoWhileRunning)
         if quiet:
             return (didRun, tooSlow, retcode, stdoutdata, stderrdata)
 
@@ -401,9 +403,9 @@ class autograder():
 
 
 
-    def run_expectExitCode(self, exe, stdindata=None, timeout=5, expectExitCode = 0, deductTimeout=0, deductSegfault=0, deductWrongExit=0):
+    def run_expectExitCode(self, exe, stdindata=None, timeout=5, expectExitCode = 0, deductTimeout=0, deductSegfault=0, deductWrongExit=0, workToDoWhileRunning=None):
         """Acts the same as run() but also deducts points if return code doesn't match expectRetExitCode."""
-        (didRun, tooSlow, retcode, stdoutdata, stderrdata) = self.run(exe, stdindata=stdindata, deductTimeout=deductTimeout, deductSegfault=deductSegfault, timeout=timeout)
+        (didRun, tooSlow, retcode, stdoutdata, stderrdata) = self.run(exe, stdindata=stdindata, deductTimeout=deductTimeout, deductSegfault=deductSegfault, timeout=timeout, workToDoWhileRunning=workToDoWhileRunning)
         # Don't deduct points for wrong exit code if we are already deducting points for segfault.
         if retcode < 0 and deductSegfault != 0:
             self.log_addEntry("Exit status: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit.")

@@ -317,17 +317,21 @@ class Canvas():
             destDir = os.path.splitext(filename)[0]
         print("Extracting " + filename + " into " + destDir);
 
-        if tarfile.is_tarfile(filename):
-            tar = tarfile.open(filename)
-            tar.extractall(path=destDir)
-            tar.close()
-            os.remove(filename)
-        import zipfile
-        if zipfile.is_zipfile(filename):
-            zip = zipfile.ZipFile(filename)
-            zip.extractall(path=destDir)
-            zip.close()
-            os.remove(filename)
+        try:
+            if tarfile.is_tarfile(filename):
+                tar = tarfile.open(filename)
+                tar.extractall(path=destDir)
+                tar.close()
+                os.remove(filename)
+                import zipfile
+            if zipfile.is_zipfile(filename):
+                zip = zipfile.ZipFile(filename)
+                zip.extractall(path=destDir)
+                zip.close()
+                os.remove(filename)
+        except:
+            print("Failed to extract file: "+filename)
+
         # Look at extracted files:
         onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
         onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]

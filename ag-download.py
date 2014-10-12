@@ -43,6 +43,6 @@ for dirpath, dnames, fnames in os.walk(subdirName):
                 magic = fileBytes.read(4)     # read 4 bytes
                 # print("".join("%02x" % b for b in magic))
                 # check that the 4 bytes match first 4 bytes of an ELF executable
-                if magic[0] == 0x7f and magic[1] == 0x45 and magic[2]==0x4c and magic[3]==0x46:
+                if len(magic) >= 4 and magic[0] == 0x7f and magic[1] == 0x45 and magic[2]==0x4c and magic[3]==0x46:
                         print(f + " is ELF executable, removing")
                         os.unlink(f)

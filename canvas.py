@@ -96,10 +96,17 @@ class Canvas():
     def getAssignments(self, courseId=None):
         """Gets list of assignments in a course."""
         courseId = courseId or self.courseId
-        if courseId == None:
-            print("Can't getAssignments without a courseId.")
-            exit()
-        return self.makeRequest("courses/"+str(courseId)+"/assignments")
+        per_page=100
+        page=1
+        # Get first page of responses
+        subsetAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?per_page="+str(per_page)+"&page="+str(page))
+        allAssignments = subsetAssignments
+        page=page+1
+        while len(subsetAssignments) == per_page:
+	        subsetAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?per_page="+str(per_page)+"&page="+str(page))
+	        allAssignments.extend(subsetAssignments)
+	        page=page+1
+        return allAssignments
 
     def getSubmissions(self, courseId=None, assignmentId=None, studentId=None):
         """Gets all submissions for a course, all submissions for a student in a course, or all submissions for a specific assignment+student combination."""
@@ -367,13 +374,21 @@ class Canvas():
     def downloadAssignment(self, courseName, assignmentName, subdirName):
         courses = self.getCourses()
         courseId = self.findCourseId(courses, courseName)
+        if courseId == None:
+	        print("Failed to find course " + courseName);
+	        exit(1)
         assignments = self.getAssignments(courseId=courseId)
+
         students    = self.getStudents(courseId=courseId)
         # Print that information
         #self.printCourseIds(courses)
         #self.printAssignmentIds(assignments)
         #self.printStudentIds(students)
         assignmentId = self.findAssignmentId(assignments, assignmentName)
+        if assignmentId == None:
+	        self.printAssignmentIds(assignments)
+	        print("Failed to find assignment " + assignmentName);
+	        exit(1)
         submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId)
         submissionsToGrade = self.findSubmissionsToGrade(submissions)
         # print(submissionsToGrade)
@@ -407,7 +422,6 @@ if __name__ == "__main__":
             print("Course name required (unless using courseList action)")
             parser.print_help()
             exit(1)
-
 
         if action == "assignmentList":
             courseId = canvas.findCourseId(courses, args.course)

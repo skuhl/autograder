@@ -316,7 +316,7 @@ class Canvas():
 
     def extractFile(self, filename, dir, newSubdir=False):
         """Extracts filename into dir. If newSubdir is set, create an additional subdirectory inside of dir to extract the files into."""
-        import tarfile
+        import tarfile,zipfile
         destDir = dir
         if newSubdir:
             # If using newSubdir, make a directory with the same
@@ -330,7 +330,6 @@ class Canvas():
                 tar.extractall(path=destDir)
                 tar.close()
                 os.remove(filename)
-                import zipfile
             if zipfile.is_zipfile(filename):
                 zip = zipfile.ZipFile(filename)
                 zip.extractall(path=destDir)

@@ -322,7 +322,7 @@ class Canvas():
             # If using newSubdir, make a directory with the same
             # name as the file but without the extension.
             destDir = os.path.splitext(filename)[0]
-        print("Extracting " + filename + " into " + destDir);
+        print(destDir + ": Extracting " + filename + " into " + destDir);
 
         try:
             if tarfile.is_tarfile(filename):
@@ -336,15 +336,15 @@ class Canvas():
                 zip.close()
                 os.remove(filename)
         except:
-            print("Failed to extract file: "+filename)
+            print(destDir + ": Failed to extract file: "+filename)
 
         # Look at extracted files:
         onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
         onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]
-        print("Submissions contained %d files and %d dirs"%(len(onlyfiles), len(onlydirs)))
+        print(destDir + ": Contains %d file(s) and %d dir(s)"%(len(onlyfiles), len(onlydirs)))
         # If submission included all files in a subdirectory, remove the subdirectory
         if len(onlyfiles) == 0 and len(onlydirs) == 1:
-            print("Getting rid of subdirectory...")
+            print(destDir + ": Removing unnecessary subdirectory.")
             shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
             tmpDir = "/tmp/autograder-tmp-dir/"+onlydirs[0]
             shutil.move(destDir+"/"+onlydirs[0], tmpDir)

@@ -295,14 +295,14 @@ class autograder():
         # If there are other files, deduct points for them.
         for f in filesInDir:
             filesize = "(" + self.humanSize(os.stat(f).st_size) + ")"
-            self.log_addEntry("Unexpected file: "+str(f)+" "+filesize, deductPoints)
+            self.log_addEntry("Unexpected file: \""+str(f)+"\" "+filesize, deductPoints)
 
     def incorrect_files(self, wrongFiles, deductPoints=0):
         """If any of the files in "files" exist, deduct points. Filenames can be regular expressions."""
         self.log_addEntry("There shouldn't be any of these files in the directory: " + str(wrongFiles))
         for f in wrongFiles:
             for g in glob.glob(f):
-                self.log_addEntry("This file shouldn't exist: " + g, deductPoints)
+                self.log_addEntry("This file shouldn't exist: \"" + g + "\"", deductPoints)
         
 
     def find_unexpected_subdirectories(self, expected_dirs, deductPoints = 0):

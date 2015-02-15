@@ -9,23 +9,47 @@ if sys.hexversion < 0x030000F0:
 # Set these to None to prompt to course and assignment names:
 courseName=None
 assignmentName=None
+subdirName=None
 
+CONFIG_FILE="ag-download.config"
+
+# See if there is a file that contains the information we need so we
+# don't need to prompt the user.
+if os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE) as f:
+        exec(f.read())
+
+# Prompt the user or show the user what settings we are using.
 if not courseName:
     print("Name of course (according to Canvas)")
     courseName = sys.stdin.readline().strip()
+else:
+    print("Using course: " + courseName + " (found in " + CONFIG_FILE + ")")
 
 if not assignmentName:
     print("Name of assignment (according to Canvas)")
     assignmentName = sys.stdin.readline().strip()
+else:
+    print("Using assignment: " + assignmentName + " (found in " + CONFIG_FILE + ")")
 
+if not subdirName:
+    print("Name of subdirectory to put submissions into?")
+    subdirName = sys.stdin.readline().strip()
+else:
+    print("Using directory: " + subdirName + " (found in " + CONFIG_FILE + ")")
 
-print("Name of subdirectory to put submissions into?")
-subdirName = sys.stdin.readline().strip()
+# Write the settings we are using out to a file so the user doesn't
+# have to type them in again next time.
+with open(CONFIG_FILE, 'w') as f:
+    f.write("courseName=\""+courseName+"\"\n")
+    f.write("assignmentName=\""+assignmentName+"\"\n")
+    f.write("subdirName=\""+subdirName+"\"\n")
+
 
 if not os.path.exists(subdirName):
     os.mkdir(subdirName)
 else:
-    print("Directory exists.")
+    print("\n")
     print("Submissions in \""+subdirName+"\" will be overwritten.")
     print("Press Ctrl+C to exit, any other key to continue.")
     yn = sys.stdin.readline()

@@ -45,7 +45,7 @@ class Command(object):
         def target():
             # To print current number of used processes, run: ps -eLF | grep $USER | wc -l
             os.environ["ULIMIT_NPROC"] = str(1024*4)            # Maximum number of processes
-            os.environ["ULIMIT_DATA"]  = str(1024*1024*1024*8)  # 8 GB of space memory
+            os.environ["ULIMIT_DATA"]  = str(1024*1024*1024*8)  # 8 GB of memory
             os.environ["ULIMIT_FSIZE"] = str(1024*1024*1024*50) # 50 GB of space for files
             autogradeobj.log_addEntry('Process manager: Thread started: '+str(self.cmd))
             limitString  = "Process manager: Limits are "
@@ -435,7 +435,8 @@ class autograder():
         (stdoutdata, stderrdata)  = cmd.communicate()
         if len(stdoutdata) < 10:
             self.log_addEntry(exe + " does not contain debugging information.", deductNoDebug)
-
+        else:
+	        self.log_addEntry(exe + " contains debugging information.", 0)
 
     def expect_md5(self, filename, expectMd5, deductMissingFile=0, deductWrongMd5=0):
         if not os.path.exists(filename):

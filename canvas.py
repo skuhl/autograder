@@ -295,8 +295,9 @@ class Canvas():
                 # Always delete existing stuff.
                 if os.path.exists(archiveFile):
                     os.unlink(archiveFile)
-                if os.path.exists(subdirName):
-                    shutil.rmtree(subdirName)
+#                We will only extract into the students subdirectory if their submission changed.
+#                if os.path.exists(subdirName):
+#                    shutil.rmtree(subdirName)
 
                 print(student['name'] + " ("+student['login_id']+") submitted " + self.prettyDate(d))
                 urllib.request.urlretrieve(attachment['url'], dir+"/"+student['login_id']+exten)
@@ -322,10 +323,11 @@ class Canvas():
             # If using newSubdir, make a directory with the same
             # name as the file but without the extension.
             destDir = os.path.splitext(filename)[0]
-        print(destDir + ": Extracting " + filename + " into " + destDir);
 
         # Save some diagnostic information that we will write to the
-        # student's subdirectory.
+        # student's subdirectory. We will write this to
+        # AUTOGRADE-*.txt files after we have extracted the submitted
+        # zip file.
         downloadTime = time.ctime(os.path.getmtime(filename))
         md5sum = ""
         with open(filename, 'rb') as fh:
@@ -337,6 +339,25 @@ class Canvas():
                 m.update(data)
             md5sum = m.hexdigest()
 
+        # Check the md5sum of the downloaded file to see if it differs
+        # from the earlier submission.
+        needToExtract = True
+        if os.path.exists(destDir+"/AUTOGRADE-MD5SUM.txt"):
+            with open(destDir+"/AUTOGRADE-MD5SUM.txt", 'r') as f:
+                contents = f.read().strip()
+                if contents == md5sum:
+                    needToExtract = False
+
+        # If the file hasn't changed, nothing else to do...
+        if not needToExtract:
+            os.remove(filename)
+            print(destDir + ": Submission hasn't changed since last download.")
+            return
+
+        # If the file has changed, extract it.
+        print(destDir + ": Extracting " + filename + " into " + destDir);
+        if os.path.exists(destDir):
+            shutil.rmtree(destDir)
         try:
             if tarfile.is_tarfile(filename):
                 tar = tarfile.open(filename)
@@ -365,11 +386,12 @@ class Canvas():
                 shutil.move(tmpDir+"/"+f, destDir)
             shutil.rmtree(tmpDir)
 
+        # Write the information about the submission to the
+        # appropriate files.
         with open(destDir+"/AUTOGRADE-TIME.txt", "w") as myfile:
             myfile.write(downloadTime+"\n")
         with open(destDir+"/AUTOGRADE-MD5SUM.txt", "w") as myfile:
             myfile.write(md5sum+"\n")
-
 
     def printCourseIds(self, courses):
         for i in courses:

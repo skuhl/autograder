@@ -6,7 +6,7 @@ import glob
 import stat
 import string
 import signal
-import time
+import time,datetime
 
 class bcolors:
     FAIL = '\033[91m\033[1m'  # red, bold
@@ -134,7 +134,8 @@ class autograder():
             if os.path.exists(f):
                 os.unlink(f)
 
-        # Make a pristine copy of the code
+        # Make a pristine copy of the code (and remove an older
+        # pristine copy if it exists.
         if os.path.exists(self.pristineDirectory):
             shutil.rmtree(self.pristineDirectory)
         shutil.copytree(self.directory, self.pristineDirectory)
@@ -149,6 +150,19 @@ class autograder():
             print("#######################################")
             print(bcolors.BOLD + msg + bcolors.ENDC)
             myfile.close()
+
+        timeFile = "AUTOGRADE-TIME.txt"
+        if os.path.exists(timeFile):
+            with open(timeFile, "r") as f:
+                contents = f.read()
+                self.log_addEntry("Submission was downloaded at approximately %s" % contents.strip())
+                self.log_addEntry("Time right now: %s" % str(datetime.datetime.now().ctime()))
+
+        md5File = "AUTOGRADE-MD5SUM.txt"
+        if os.path.exists(md5File):
+            with open(md5File, "r") as f:
+                contents = f.read()
+                self.log_addEntry("The file we downloaded from canvas has md5sum: %s" % contents.strip())
 
         # Adjust grade based on the contents of AUTOGRADE-MANUAL.txt
         # that the teacher may have added to the directory. This file

@@ -46,13 +46,14 @@ with open(CONFIG_FILE, 'w') as f:
     f.write("subdirName=\""+subdirName+"\"\n")
 
 
-if not os.path.exists(subdirName):
-    os.mkdir(subdirName)
-else:
+if os.path.exists(subdirName):
     print("\n")
     print("Submissions in \""+subdirName+"\" will be overwritten.")
     print("Press Ctrl+C to exit, any other key to continue.")
     yn = sys.stdin.readline()
+    shutil.rmtree(subdirName)
+
+os.mkdir(subdirName);
 
 # Download the assignments from Canvas.
 c = canvas.Canvas()

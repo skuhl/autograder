@@ -2,7 +2,7 @@
 # Author: Scott Kuhl
 import json, urllib.request
 import textwrap
-import sys,shutil,os
+import sys,shutil,os,time,hashlib
 from pprint import pprint
 import argparse
 
@@ -324,6 +324,19 @@ class Canvas():
             destDir = os.path.splitext(filename)[0]
         print(destDir + ": Extracting " + filename + " into " + destDir);
 
+        # Save some diagnostic information that we will write to the
+        # student's subdirectory.
+        downloadTime = time.ctime(os.path.getmtime(filename))
+        md5sum = ""
+        with open(filename, 'rb') as fh:
+            m = hashlib.md5()
+            while True:
+                data = fh.read(8192)
+                if not data:
+                    break
+                m.update(data)
+            md5sum = m.hexdigest()
+
         try:
             if tarfile.is_tarfile(filename):
                 tar = tarfile.open(filename)
@@ -351,7 +364,12 @@ class Canvas():
             for f in os.listdir(tmpDir):
                 shutil.move(tmpDir+"/"+f, destDir)
             shutil.rmtree(tmpDir)
-            
+
+        with open(destDir+"/AUTOGRADE-TIME.txt", "w") as myfile:
+            myfile.write(downloadTime+"\n")
+        with open(destDir+"/AUTOGRADE-MD5SUM.txt", "w") as myfile:
+            myfile.write(md5sum+"\n")
+
 
     def printCourseIds(self, courses):
         for i in courses:

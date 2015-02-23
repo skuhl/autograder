@@ -47,6 +47,14 @@ if not os.path.exists(subdir):
 print("Enter the domain name of the sender and recipients:")
 domain = sys.stdin.readline().strip()
 
+print("Only send mail to students with updated submissions? [default: no]")
+onlyUpdated = sys.stdin.readline().strip()
+if onlyUpdated == "y" or onlyUpdated == "yes":
+    onlyUpdated = True
+else:
+    onlyUpdated = False
+
+
 
 os.chdir(subdir)
 cwd = os.getcwd()
@@ -62,7 +70,6 @@ if errorOccured:
     print("Press any key to email reports or Ctrl+C to exit.")
     sys.stdin.readline()
 
-
 print("Enter the subject line for the email message.")
 subject = sys.stdin.readline().strip()
 
@@ -72,14 +79,23 @@ mypassword = getpass.getpass("Password for " + senderEmail + ": ")
 emailLogin(senderEmail, mypassword)
 
 
-
 # send email messages
 for thisDir in dirs:
-    if os.path.exists(thisDir + "/AUTOGRADE.txt"):
-        print("Sending message to: "+thisDir+"@"+domain)
-        with open(thisDir + "/AUTOGRADE.txt", 'r') as content_file:
-            content = content_file.read()
-        emailStudent(senderEmail, thisDir, subject, content)
+    agFilename = thisDir + "/AUTOGRADE.txt"
+    agUpFilename = thisDir + "/AUTOGRADE-IS-UPDATED.txt"
+
+    if os.path.exists(agFilename):
+        # If we are sending mail to all students 
+        if not onlyUpdated or (onlyUpdated and os.path.exists(agUpFilename)):
+            print("Sending message to: "+thisDir+"@"+domain)
+            with open(agFilename, 'r') as content_file:
+                content = content_file.read()
+            emailStudent(senderEmail, thisDir, subject, content)
+            if os.path.exists(agUpFilename):
+                os.delete(agUpFilename)
+        else:
+            print("NOT sending message to: "+thisDir"@"+domain+" because the submission hasn't been updated since we last emailed them.")
+        
     else:
         print("Skipping: "+thisDir+"@"+domain + "(no AUTOGRADE.txt file)")
 

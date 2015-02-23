@@ -392,7 +392,10 @@ class Canvas():
             myfile.write(downloadTime+"\n")
         with open(destDir+"/AUTOGRADE-MD5SUM.txt", "w") as myfile:
             myfile.write(md5sum+"\n")
+        with open(destDir+"/AUTOGRADE-IS-UPDATED.txt", "w") as myfile:
+            myfile.write("This submission has been updated since the last time we emailed the submissions out to students.\n")
 
+            
     def printCourseIds(self, courses):
         for i in courses:
             print("%10s \"%s\""%(str(i['id']), i['name']))

@@ -2,7 +2,7 @@
 # Author: Scott Kuhl
 import json, urllib.request
 import textwrap
-import sys,shutil,os,time,hashlib
+import sys,shutil,os,time,hashlib,re
 from pprint import pprint
 import argparse
 
@@ -51,12 +51,35 @@ class Canvas():
     def makeRequest(self,request):
         """Makes the given request (passes token as header)"""
         try:
-            requestString = self.CANVAS_API+request
+            # Tack on http://.../ to the beginning of the request if needed
+            if self.CANVAS_API not in request:
+                requestString = self.CANVAS_API+request
+            else:
+                requestString = request
+        
             print("Sending request: " +requestString)
             request = urllib.request.Request(requestString)
             request.add_header("Authorization", "Bearer " + self.CANVAS_TOKEN);
-            json_string = urllib.request.urlopen(request).readall().decode('utf-8');
-            return json.loads(json_string)
+            response = urllib.request.urlopen(request)
+            json_string = response.readall().decode('utf-8');
+            retVal = json.loads(json_string)
+
+            # Deal with pagination:
+            # https://canvas.instructure.com/doc/api/file.pagination.html
+            #
+            # Load the next page if needed and tack the results onto
+            # the end.
+            response_headers = dict(response.info())
+            link_header = response_headers['Link']
+            link_header_split = link_header.split(",")
+            for s in link_header_split:
+                match = re.match('<(.*)>; rel="next"', s)
+                if not match:
+                    continue
+                else:
+                    retVal.extend(self.makeRequest(match.group(1)))
+
+            return retVal
         except:
             e = sys.exc_info()[0]
             print(e)
@@ -67,23 +90,8 @@ class Canvas():
 
     def getCourses(self):
         """Gets course objects"""
-        per_page=100
-        page=1
-
-        # Get first page of responses
-        subsetCourses = self.makeRequest("courses?per_page="+str(per_page)+"&page="+str(page))
-        allCourses = subsetCourses
-        page=page+1
-
-        # While pages are full, get more pages
-        while len(subsetCourses) == per_page:
-            subsetCourses = self.makeRequest("courses?per_page="+str(per_page)+"&page="+str(page))
-            #print("courses on page: " + str(len(subsetCourses)))
-            allCourses.extend(subsetCourses)
-            page=page+1
-
+        allCourses = self.makeRequest("courses?per_page=100&page=1")
         return allCourses
-
 
     def getStudents(self, courseId=None):
         """Gets list of students in a course."""
@@ -96,16 +104,7 @@ class Canvas():
     def getAssignments(self, courseId=None):
         """Gets list of assignments in a course."""
         courseId = courseId or self.courseId
-        per_page=100
-        page=1
-        # Get first page of responses
-        subsetAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?per_page="+str(per_page)+"&page="+str(page))
-        allAssignments = subsetAssignments
-        page=page+1
-        while len(subsetAssignments) == per_page:
-	        subsetAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?per_page="+str(per_page)+"&page="+str(page))
-	        allAssignments.extend(subsetAssignments)
-	        page=page+1
+        allAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?per_page=100&page=1")
         return allAssignments
 
     def getSubmissions(self, courseId=None, assignmentId=None, studentId=None):

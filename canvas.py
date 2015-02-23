@@ -285,6 +285,7 @@ class Canvas():
                i['attachments'][0]['filename']:
                 student = self.findStudent(students, i['user_id'])
                 attachment = i['attachments'][0]
+                # self.prettyPrint(attachment)
                 filename = attachment['filename']
                 exten = os.path.splitext(filename)[1] # get filename extension
                 import datetime
@@ -392,9 +393,6 @@ class Canvas():
             myfile.write(downloadTime+"\n")
         with open(destDir+"/AUTOGRADE-MD5SUM.txt", "w") as myfile:
             myfile.write(md5sum+"\n")
-        with open(destDir+"/AUTOGRADE-IS-UPDATED.txt", "w") as myfile:
-            myfile.write("This submission has been updated since the last time we emailed the submissions out to students.\n")
-
             
     def printCourseIds(self, courses):
         for i in courses:

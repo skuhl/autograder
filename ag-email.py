@@ -47,14 +47,6 @@ if not os.path.exists(subdir):
 print("Enter the domain name of the sender and recipients:")
 domain = sys.stdin.readline().strip()
 
-print("Only send mail to students with updated submissions? [default: no]")
-onlyUpdated = sys.stdin.readline().strip()
-if onlyUpdated == "y" or onlyUpdated == "yes":
-    onlyUpdated = True
-else:
-    onlyUpdated = False
-
-
 
 os.chdir(subdir)
 cwd = os.getcwd()
@@ -82,22 +74,24 @@ emailLogin(senderEmail, mypassword)
 # send email messages
 for thisDir in dirs:
     agFilename = thisDir + "/AUTOGRADE.txt"
-    agUpFilename = thisDir + "/AUTOGRADE-IS-UPDATED.txt"
+    agEmailedFilename = thisDir + "/AUTOGRADE-EMAILED.txt"
 
-    if os.path.exists(agFilename):
-        # If we are sending mail to all students 
-        if not onlyUpdated or (onlyUpdated and os.path.exists(agUpFilename)):
-            print("Sending message to: "+thisDir+"@"+domain)
-            with open(agFilename, 'r') as content_file:
-                content = content_file.read()
-            emailStudent(senderEmail, thisDir, subject, content)
-            if os.path.exists(agUpFilename):
-                os.remove(agUpFilename)
-        else:
-            print("NOT sending message to: "+thisDir+"@"+domain+" because the submission hasn't been updated since we last emailed them.")
-        
-    else:
-        print("Skipping: "+thisDir+"@"+domain + "(no AUTOGRADE.txt file)")
+    if not os.path.exists(agFilename):
+        print(thisDir + " SKIPPING - AUTOGRADE.txt is missing.")
+        continue;
+    if os.path.exists(agEmailedFilename):
+        print(thisDir + " SKIPPING - AUTOGRADE-EMAILED.txt is present; report has already been emailed.")
+        continue;
+    # We don't care if AUTOGRADE-DONE.txt is present since that is
+    # only used to determine if we need to rerun the autograder---not
+    # to determine if we need to email them or not.
+
+    print("Sending message to: "+thisDir+"@"+domain)
+    with open(agFilename, 'r') as content_file:
+        content = content_file.read()
+    #emailStudent(senderEmail, thisDir, subject, content)
+    with open(agEmaieldFilename, "w") as f:
+        f.write("Autograder report has been emailed to the student\n")
 
 # logout
 emailLogout()

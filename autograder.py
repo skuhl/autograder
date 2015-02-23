@@ -118,32 +118,39 @@ class Command(object):
 
 
 class autograder():
-    def __init__(self, logFile, directory, totalPoints=100):
-        self.origwd = os.getcwd()
+    def __init__(self, logFile, username, totalPoints=100):
         self.logPointsTotal = 100
-        self.logFile = os.path.join(self.origwd, logFile)
-        self.directory = directory
-        self.pristineDirectory = "/tmp/autograde-" + directory
 
-        # delete autograde file in the directory
-        toDelete = [ self.logFile,
-                     self.directory + "/" + logFile, 
-                     self.directory + "/" + "AUTOGRADE-STDOUT-TEMP-FILE.txt",
-                     self.directory + "/" + "AUTOGRADE-STDERR-TEMP-FILE.txt" ]
-        for f in toDelete:
-            if os.path.exists(f):
-                os.unlink(f)
+        # Location of the AUTOGRADE.txt file. This file is neither in
+        # the working directory nor in the actual submission
+        # directory. It will be moved to the student submission
+        # directory when the autograder is complete (i.e., cleanup()
+        # is called).
+        self.logFile = os.path.join("/tmp", logFile)
+        
+        # Absolute path that we need to chdir back to when finished
+        self.origwd = os.getcwd() 
 
-        # Make a pristine copy of the code (and remove an older
-        # pristine copy if it exists.
-        if os.path.exists(self.pristineDirectory):
-            shutil.rmtree(self.pristineDirectory)
-        shutil.copytree(self.directory, self.pristineDirectory)
+        # Absolute path to the folder containing the student
+        # submission.
+        self.directory = os.path.join(self.origwd, username)
 
+        # The autograder will do its work in a working directory
+        self.workingDirectory = "/tmp/autograde-working-" + username
+
+        # Copy the student's submission into the working
+        # directory. The only thing that needs to be copied back to
+        # the original submission is the AUTOGRADE.txt file.
+        if os.path.exists(self.workingDirectory):
+            shutil.rmtree(self.workingDirectory)
+        shutil.copytree(self.directory, self.workingDirectory)
+
+        # Change into working directory
+        os.chdir(self.workingDirectory)
+        
         # Print a header for this student to the console and log file.
-        os.chdir(directory)
         with open(self.logFile, "a") as myfile:
-            msg = "=== " + directory
+            msg = "=== " + username
             myfile.write(msg + "\n")
             print("#######################################")
             print("#######################################")
@@ -151,6 +158,9 @@ class autograder():
             print(bcolors.BOLD + msg + bcolors.ENDC)
             myfile.close()
 
+        # Add some basic information to AUTOGRADE.txt so that students
+        # can figure out exactly which submission the autograder
+        # graded.
         timeFile = "AUTOGRADE-TIME.txt"
         if os.path.exists(timeFile):
             with open(timeFile, "r") as f:
@@ -162,7 +172,7 @@ class autograder():
         if os.path.exists(md5File):
             with open(md5File, "r") as f:
                 contents = f.read()
-                self.log_addEntry("The file we downloaded from canvas has md5sum: %s" % contents.strip())
+                self.log_addEntry("The file we downloaded from Canvas has md5sum: %s" % contents.strip())
 
         # Adjust grade based on the contents of AUTOGRADE-MANUAL.txt
         # that the teacher may have added to the directory. This file
@@ -176,12 +186,10 @@ class autograder():
                 manualLabel = ' '.join(manFileContents.split(' ')[1:])
                 self.log_addEntry(manualLabel.strip(), manualScore)
 
-
-
     def cleanup(self):
-        self.pristine()
-        shutil.rmtree(self.pristineDirectory)
+        """Remove the working directory and copy the autograde score to the original directory."""
         os.chdir(self.origwd)
+        shutil.rmtree(self.workingDirectory)
         # Appends the student's total score to the log file.
         msg = "TOTAL (instructor/TA/grader may adjust it!): " + str(self.logPointsTotal) + "\n"
         if self.logPointsTotal < 0:
@@ -190,20 +198,38 @@ class autograder():
             myfile.write(msg)
             myfile.close()
         print(bcolors.BOLD + msg + bcolors.ENDC);
-        # move autograde file to its final destination
-        shutil.move(self.logFile, self.directory)
+
+        # move autograde file to its final destination (in the
+        # original directory, not the working directory)
+        logFileDestination = os.path.join(self.directory, os.path.basename(self.logFile))
+        if os.path.exists(logFileDestination):
+            os.remove(logFileDestination)
+        shutil.move(self.logFile, logFileDestination)
+
+        # Write an AUTOGRADE-DONE.txt file so we don't rerun the
+        # autograder on this submission. This AUTOGRADE-DONE file will
+        # then be erased once a new submission is downloaded.
+        doneDestination = os.path.join(self.directory, "AUTOGRADE-DONE.txt")
+        with open(doneDestination, "w") as f:
+            f.write("Autograder has run on this submission.\n")
+
+        # If we just regraded and AUTOGRADE-EMAILED.txt is present,
+        # delete AUTOGRADE-EMAILED.txt to ensure that the newest
+        # autograder run will be sent to the student.
+        emailedDestination = os.path.join(self.directory, "AUTOGRADE-EMAILED.txt")
+        if os.path.exists(emailedDestination):
+            os.remove(emailedDestination)
+
 
     def pristine(self):
-        """Restores the directory that we are grading back to it's original pristine state (without deleting the pristine copy---so we can use it again if needed!)"""
-        if os.path.exists(self.pristineDirectory):
-            self.log_addEntry("Restoring directory to is original state (i.e., as the student submitted it.)")
+        """Reset working directory to match the submission."""
+        if os.path.exists(self.workingDirectory):
+            self.log_addEntry("Restoring working directory to its original state (i.e., as the student submitted it.)")
             os.chdir(self.origwd)
-            shutil.rmtree(self.directory)
-            shutil.copytree(self.pristineDirectory, self.directory)
-            os.chdir(self.directory)
-        else:
-            print("Can't restore pristine directory because it doesn't exist.")
-            exit(1)
+            shutil.rmtree(self.workingDirectory)
+            shutil.copytree(self.directory, self.workingDirectory)
+            os.chdir(self.workingDirectory)
+
 
     def signal_to_string(self, signalNumber):
         if signalNumber < 0:

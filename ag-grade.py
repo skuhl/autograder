@@ -13,7 +13,7 @@ def compile_warning_errors(ag):
 
     for line in stderrdata.split('\n'):
         if " warning: " in line:
-            ag.log_addEntry("Compiler warning: " + line, -3)
+            ag.log_addEntry("Compiler warning: " + line, -2)
         if " error: " in line:
             ag.log_addEntry("Compiler error: " + line, -10)
 
@@ -22,32 +22,64 @@ def cppcheck(ag):
                            shell=True, stdout=subprocess.PIPE, 
                            stderr=subprocess.PIPE)
     (stdoutdata, stderrdata)  = cmd.communicate()
-    stderrdata = str(stderrdata)
+    stderrdata = stderrdata.decode('utf-8','replace')
     for line in stderrdata.split('\n'):
         if "(error)" in line:
-            ag.log_addEntry("cppcheck error: " + line, -2)
+            ag.log_addEntry("cppcheck error: " + line, -1)
 
 
-print("Enter the directory that contains subdirectories (one per student, named after students' usernames):")
-subdir = sys.stdin.readline().strip()
-if not os.path.exists(subdir):
-    print("Directory doesn't exist. Exiting.")
-    exit(1)
+def stringMustContain(ag, haystack, needle, pts):
+    needlelow = needle.lower()
+    haystacklow = haystack.lower()
+    if needlelow not in haystacklow:
+        ag.log_addEntry("Output did not contain '" + needle + "'", pts);
+    else:
+        ag.log_addEntry("Output correctly contained '" + needle + "'", 0);
+
+def stringMustNotContain(ag, haystack, needle, pts):
+    needlelow = needle.lower()
+    haystacklow = haystack.lower()
+    if needlelow not in haystacklow:
+         ag.log_addEntry("Output correctly lacked '" + needle + "'.", 0);
+    else:
+        ag.log_addEntry("Output incorrectly contained '" + needle + "'.", pts);
+
+# See if there is a file that contains the information we need so we
+# don't need to prompt the user.
+CONFIG_FILE="ag-download.config"
+if os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE) as f:
+        exec(f.read())
+
+if not subdirName:
+    print("Enter the directory that contains subdirectories (one per student, named after students' usernames):")
+    subdirName = sys.stdin.readline().strip()
+    if not os.path.exists(subdirName):
+        print("Directory doesn't exist. Exiting.")
+        exit(1)
 
 # Get a list of subdirectories (each student submission will be in its own subdirectory)
-dirs = [name for name in os.listdir(subdir) if os.path.isdir(os.path.join(subdir, name))]
+dirs = [name for name in os.listdir(subdirName) if os.path.isdir(os.path.join(subdirName, name))]
 dirs.sort()
-os.chdir(subdir)
+os.chdir(subdirName)
+
+
 
 # For each subdirectory (i.e., student)
 for thisDir in dirs:
+    # Skip submissions that do not need regrading. This should be
+    # uncommented if the autograder itself is changed.
+    if os.path.exists(os.path.join(thisDir, "AUTOGRADE-DONE.txt")):
+        print("SKIPPING %s because it has already been autograded." % thisDir);
+        continue
+    
     # Set up the autograder
     ag = autograder.autograder("AUTOGRADE.txt", thisDir)
 
     # Verify that the files are there that we are expecting and look for unexpected files.
-    ag.expect_only_files(["makefile", "Makefile", "*.c", "*.h", "README", "README.txt", "AUTOGRADE*.txt"])
-    ag.find_unexpected_subdirectories([])
-    ag.expect_file_one_of(["*.c", "*.C"], 1)
+    ag.expect_only_files(["makefile", "Makefile", "*.c", "*.cpp", "*.h", "README", "README.txt", "AUTOGRADE*.txt"], 1)
+    ag.find_unexpected_subdirectories([], 1)
+    ag.expect_file_one_of(["*.c", "*.C", "*.cpp"], 1)
     ag.expect_file_one_of(["makefile", "Makefile"], 5)
 
     exe=[ 'mtusort' ] # a list of executables we are expecting

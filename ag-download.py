@@ -11,10 +11,10 @@ courseName=None
 assignmentName=None
 subdirName=None
 
-CONFIG_FILE="ag-download.config"
 
 # See if there is a file that contains the information we need so we
 # don't need to prompt the user.
+CONFIG_FILE="ag-download.config"
 if os.path.exists(CONFIG_FILE):
     with open(CONFIG_FILE) as f:
         exec(f.read())
@@ -46,13 +46,7 @@ with open(CONFIG_FILE, 'w') as f:
     f.write("subdirName=\""+subdirName+"\"\n")
 
 
-if os.path.exists(subdirName):
-    print("\n")
-    print("Submissions already in \""+subdirName+"\" will be updated.")
-    print("Press Ctrl+C to exit, any other key to continue.")
-    yn = sys.stdin.readline()
-#    shutil.rmtree(subdirName)
-else:
+if not os.path.exists(subdirName):
     os.mkdir(subdirName);
 
 # Download the assignments from Canvas.

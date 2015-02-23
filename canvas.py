@@ -70,6 +70,8 @@ class Canvas():
             # Load the next page if needed and tack the results onto
             # the end.
             response_headers = dict(response.info())
+            if "Link" not in response_headers:
+                return retVal
             link_header = response_headers['Link']
             link_header_split = link_header.split(",")
             for s in link_header_split:

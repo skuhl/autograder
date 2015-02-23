@@ -19,33 +19,6 @@ if os.path.exists(CONFIG_FILE):
     with open(CONFIG_FILE) as f:
         exec(f.read())
 
-# Prompt the user or show the user what settings we are using.
-if not courseName:
-    print("Name of course (according to Canvas)")
-    courseName = sys.stdin.readline().strip()
-else:
-    print("Using course: " + courseName + " (found in " + CONFIG_FILE + ")")
-
-if not assignmentName:
-    print("Name of assignment (according to Canvas)")
-    assignmentName = sys.stdin.readline().strip()
-else:
-    print("Using assignment: " + assignmentName + " (found in " + CONFIG_FILE + ")")
-
-if not subdirName:
-    print("Name of subdirectory to put submissions into?")
-    subdirName = sys.stdin.readline().strip()
-else:
-    print("Using directory: " + subdirName + " (found in " + CONFIG_FILE + ")")
-
-# Write the settings we are using out to a file so the user doesn't
-# have to type them in again next time.
-with open(CONFIG_FILE, 'w') as f:
-    f.write("courseName=\""+courseName+"\"\n")
-    f.write("assignmentName=\""+assignmentName+"\"\n")
-    f.write("subdirName=\""+subdirName+"\"\n")
-
-
 if not os.path.exists(subdirName):
     os.mkdir(subdirName);
 

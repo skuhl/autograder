@@ -83,13 +83,14 @@ class Command(object):
                 autogradeobj.log_addEntry('Process manager: Process exited after ' + elapsedTime + ' with return code ' + str(self.retcode))
 
 
-        thread = threading.Thread(target=target)
-        thread.start()
-        time.sleep(.5)
-        if workToDoWhileRunning:
-            workToDoWhileRunning()
         try:
+            thread = threading.Thread(target=target)
+            thread.start()
+            time.sleep(.5)
+            if workToDoWhileRunning:
+                workToDoWhileRunning()
             thread.join(timeout)
+
         # Without this, Ctrl+C will cause python to exit---but we will
         # be forced to wait until the process we are running times out
         # too. With this, we try to exit gracefully.

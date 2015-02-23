@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys, os
-import getpass, smtplib
+import datetime, smtplib
 
 if sys.hexversion < 0x030000F0:
     print("This script requires Python 3")
@@ -9,7 +9,7 @@ if sys.hexversion < 0x030000F0:
 
 
 emailSession = None
-domain = None
+domainName = None
 
 def emailLogin(senderEmail, mypassword):
     global emailSession
@@ -24,7 +24,7 @@ def emailLogout():
     emailSession.quit()
 
 def emailStudent(senderEmail, studentUsername, subject, text):
-    recipients = [ studentUsername + "@" + domain ]   # list of recipients
+    recipients = [ studentUsername + "@" + domainName ]   # list of recipients
     body = text  # body of message
     headers = ["From: " + senderEmail,
                "Subject: " + subject,
@@ -36,40 +36,39 @@ def emailStudent(senderEmail, studentUsername, subject, text):
     emailSession.sendmail(senderEmail, recipients, headers + "\r\n\r\n" + body)
 
 
-import sys
-print("Enter the directory that contains subdirectories (one per student, named after students' usernames):")
-subdir = sys.stdin.readline().strip()
 
-if not os.path.exists(subdir):
-    print("Directory doesn't exist. Exiting.")
+# See if there is a file that contains the information we need so we
+# don't need to prompt the user.
+CONFIG_FILE="ag-download.config"
+if os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE) as f:
+        exec(f.read())
+
+
+if not subdirName or not os.path.exists(subdirName):
+    print("Directory %s doesn't exist. Exiting." % str(subdirName))
+    exit(1)
+if not domainName:
+    print("Domain name not provided.")
+    exit(1)
+if not emailSubject:
+    print("Email subject missing.")
+    exit(1)
+if not emailUser:
+    print("Email username missing.")
+    exit(1)
+if not emailPassword:
+    print("Email password missing.")
     exit(1)
 
-print("Enter the domain name of the sender and recipients:")
-domain = sys.stdin.readline().strip()
-
-
-os.chdir(subdir)
+os.chdir(subdirName)
 cwd = os.getcwd()
 dirs = [name for name in os.listdir(cwd) if os.path.isdir(os.path.join(cwd, name))]
 dirs.sort()
 
-errorOccured = False
-for thisDir in dirs:
-    if not os.path.exists(thisDir + "/AUTOGRADE.txt"):
-        print("ERROR: No AUTOGRADE.txt file to send to "+thisDir+"@"+domain)
-        errorOccured = True
-if errorOccured:
-    print("Press any key to email reports or Ctrl+C to exit.")
-    sys.stdin.readline()
-
-print("Enter the subject line for the email message.")
-subject = sys.stdin.readline().strip()
-
 # Login to email server
-senderEmail = getpass.getuser() + '@' + domain
-mypassword = getpass.getpass("Password for " + senderEmail + ": ")
-emailLogin(senderEmail, mypassword)
-
+senderEmail = emailUser + '@' + domainName
+emailLogin(senderEmail, emailPassword)
 
 # send email messages
 for thisDir in dirs:
@@ -86,12 +85,13 @@ for thisDir in dirs:
     # only used to determine if we need to rerun the autograder---not
     # to determine if we need to email them or not.
 
-    print("Sending message to: "+thisDir+"@"+domain)
+    print("Sending message to: "+thisDir+"@"+domainName)
     with open(agFilename, 'r') as content_file:
         content = content_file.read()
-    #emailStudent(senderEmail, thisDir, subject, content)
-    with open(agEmaieldFilename, "w") as f:
-        f.write("Autograder report has been emailed to the student\n")
+    emailStudent(senderEmail, thisDir, emailSubject, content)
+
+    with open(agEmailedFilename, "w") as f:
+        f.write("We emailed this student the autograder report at "+str(datetime.datetime.now().ctime()) + " with the subject: " + emailSubject + "\n")
 
 # logout
 emailLogout()

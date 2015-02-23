@@ -92,9 +92,9 @@ for thisDir in dirs:
                 content = content_file.read()
             emailStudent(senderEmail, thisDir, subject, content)
             if os.path.exists(agUpFilename):
-                os.delete(agUpFilename)
+                os.remove(agUpFilename)
         else:
-            print("NOT sending message to: "+thisDir"@"+domain+" because the submission hasn't been updated since we last emailed them.")
+            print("NOT sending message to: "+thisDir+"@"+domain+" because the submission hasn't been updated since we last emailed them.")
         
     else:
         print("Skipping: "+thisDir+"@"+domain + "(no AUTOGRADE.txt file)")

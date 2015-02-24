@@ -23,7 +23,7 @@ if not os.path.exists(subdirName):
     os.mkdir(subdirName);
 
 # Download the assignments from Canvas.
-c = canvas.Canvas()
+c = canvas.canvas()
 c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName)
 
 # Look for ELF executables the user might have submitted and remove them!

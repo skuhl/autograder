@@ -206,13 +206,14 @@ class autograder():
         if os.path.exists(logFileDestination):
             os.remove(logFileDestination)
         shutil.move(self.logFile, logFileDestination)
+        print("Wrote: %s" % logFileDestination)
 
         # Write an AUTOGRADE-DONE.txt file so we don't rerun the
         # autograder on this submission. This AUTOGRADE-DONE file will
         # then be erased once a new submission is downloaded.
         doneDestination = os.path.join(self.directory, "AUTOGRADE-DONE.txt")
         with open(doneDestination, "w") as f:
-            f.write("Autograder has run on this submission.\n")
+            f.write("This submission was autograded at %s.\n" % str(datetime.datetime.now().ctime()))
 
         # If we just regraded and AUTOGRADE-EMAILED.txt is present,
         # delete AUTOGRADE-EMAILED.txt to ensure that the newest

@@ -27,7 +27,7 @@ import argparse
 # courseId in your calls to specific functions.
 
 
-class Canvas():
+class canvas():
     CANVAS_API = ""
     CANVAS_TOKEN = None
     courseId = 0;
@@ -247,28 +247,29 @@ class Canvas():
                 print(fmtStr%(graded, late, str(hist['attempt']), str(student['login_id']), student['name']))
 
 
-    def prettyDate(self, d):
+    @classmethod
+    def prettyDate(obj, d, now):
         import datetime
-        diff = datetime.datetime.utcnow() - d
+        diff = now - d
         s = diff.seconds
         if diff.days > 7 or diff.days < 0:
             return d.strftime('%Y-%m-%d')
         elif diff.days == 1:
-            return '1 day ago'
+            return ' 1 day ago'
         elif diff.days > 1:
-            return '{:d} days ago'.format(int(diff.days))
+            return '{:2d} days ago'.format(int(diff.days))
         elif s <= 1:
             return 'just now'
         elif s < 60:
-            return '{:d} seconds ago'.format(int(s))
+            return '{:2d} seconds ago'.format(int(s))
         elif s < 120:
-            return '1 minute ago'
+            return ' 1 minute ago'
         elif s < 3600:
-            return '{:d} minutes ago'.format(int(s/60))
+            return '{:2d} minutes ago'.format(int(s/60))
         elif s < 7200:
-            return '1 hour ago'
+            return ' 1 hour ago'
         else:
-            return '{:d} hours ago'.format(int(s/3600))
+            return '{:2d} hours ago'.format(int(s/3600))
 
                 
     def downloadSubmissions(self, submissions, students, dir="None"):
@@ -301,7 +302,7 @@ class Canvas():
 #                if os.path.exists(subdirName):
 #                    shutil.rmtree(subdirName)
 
-                print(student['name'] + " ("+student['login_id']+") submitted " + self.prettyDate(d))
+                print(student['name'] + " ("+student['login_id']+") submitted " + self.prettyDate(d, datetime.datetime.utcnow()))
                 urllib.request.urlretrieve(attachment['url'], dir+"/"+student['login_id']+exten)
 
 

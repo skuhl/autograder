@@ -1,23 +1,17 @@
 #!/usr/bin/env python3
 import sys,shutil,os
-import canvas
+import canvas,autograder
 
 if sys.hexversion < 0x030000F0:
     print("This script requires Python 3")
     sys.exit(1)
 
-# Set these to None to prompt to course and assignment names:
-courseName=None
-assignmentName=None
-subdirName=None
-
-
-# See if there is a file that contains the information we need so we
-# don't need to prompt the user.
-CONFIG_FILE="ag-download.config"
-if os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE) as f:
-        exec(f.read())
+# Load configuration information
+config = autograder.config()
+settings = config.get()
+subdirName = settings['subdirName']
+courseName = settings['courseName']
+assignmentName = settings['assignmentName']
 
 if not os.path.exists(subdirName):
     os.mkdir(subdirName);

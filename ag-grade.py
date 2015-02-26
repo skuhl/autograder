@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import autograder, canvas
 import subprocess
-import shutil, os, stat, sys
+import shutil, os, stat, sys, re
 
 if sys.hexversion < 0x030000F0:
     print("This script requires Python 3")
@@ -27,36 +27,32 @@ def cppcheck(ag):
         if "(error)" in line:
             ag.log_addEntry("cppcheck error: " + line, -1)
 
+def stringMustContainRegex(ag, haystack, needle, pts):
+    if re.search(needle, haystack, re.IGNORECASE):
+        ag.log_addEntry("Output correctly contained '" + needle + "' (regex)", 0);
+    else:
+        ag.log_addEntry("Output did not contain '" + needle + "' (regex)", pts);
 
 def stringMustContain(ag, haystack, needle, pts):
     needlelow = needle.lower()
     haystacklow = haystack.lower()
-    if needlelow not in haystacklow:
-        ag.log_addEntry("Output did not contain '" + needle + "'", pts);
-    else:
+    if needlelow in haystacklow:
         ag.log_addEntry("Output correctly contained '" + needle + "'", 0);
+    else:
+        ag.log_addEntry("Output did not contain '" + needle + "'", pts);
 
 def stringMustNotContain(ag, haystack, needle, pts):
     needlelow = needle.lower()
     haystacklow = haystack.lower()
     if needlelow not in haystacklow:
-         ag.log_addEntry("Output correctly lacked '" + needle + "'.", 0);
+        ag.log_addEntry("Output correctly lacked '" + needle + "'.", 0);
     else:
         ag.log_addEntry("Output incorrectly contained '" + needle + "'.", pts);
 
-# See if there is a file that contains the information we need so we
-# don't need to prompt the user.
-CONFIG_FILE="ag-download.config"
-if os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE) as f:
-        exec(f.read())
+config = autograder.config()
+settings = config.get()
+subdirName = settings['subdirName']
 
-if not subdirName:
-    print("Enter the directory that contains subdirectories (one per student, named after students' usernames):")
-    subdirName = sys.stdin.readline().strip()
-    if not os.path.exists(subdirName):
-        print("Directory doesn't exist. Exiting.")
-        exit(1)
 
 # Get a list of subdirectories (each student submission will be in its own subdirectory)
 dirs = [name for name in os.listdir(subdirName) if os.path.isdir(os.path.join(subdirName, name))]
@@ -67,9 +63,8 @@ os.chdir(subdirName)
 
 # For each subdirectory (i.e., student)
 for thisDir in dirs:
-    # Skip submissions that do not need regrading. This should be
-    # uncommented if the autograder itself is changed.
-    if os.path.exists(os.path.join(thisDir, "AUTOGRADE-DONE.txt")):
+    # Skip submissions that do not need regrading. All AUTOGRADE.txt files should be deleted whenever the autograder tests are changed to ensure that the new tests are applied to any already-autograded.
+    if os.path.exists(os.path.join(thisDir, "AUTOGRADE.txt")):
         print("SKIPPING %s because it has already been autograded." % thisDir);
         continue
     

@@ -7,12 +7,37 @@ import stat
 import string
 import signal
 import time,datetime
+import json
 
 class bcolors:
     FAIL = '\033[91m\033[1m'  # red, bold
     WARN = '\033[93m\033[1m'  # yellow, bold
     ENDC = '\033[0m'          # reset colors back to normal
     BOLD = '\033[1m'
+
+
+class config():
+    configfile = ""
+    settings = {};
+
+    def __init__(self, configfile="autograde-config.json"):
+        """Load a config file, overwrite existing settings"""
+        self.configfile = os.path.abspath(configfile)
+        if os.path.exists(self.configfile):
+            with open(self.configfile, "r") as f:
+                self.settings = json.load(f)
+
+    def get(self):
+        return self.settings
+
+    def set(self, newSettings):
+        self.settings = newSettings
+
+    def write(self):
+        with open(self.configfile, "w") as f:
+            json.dump(self.settings, f, indent=4)
+            # add trailing newline
+            f.write('\n')
 
 
 # http://stackoverflow.com/questions/1191374/subprocess-with-timeout

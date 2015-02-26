@@ -2,18 +2,32 @@
 
 import sys, os
 import datetime, smtplib
+import autograder
 
 if sys.hexversion < 0x030000F0:
     print("This script requires Python 3")
     sys.exit(1)
 
 
+# Load configuration information
+config        = autograder.config()
+settings      = config.get()
+subdirName    = settings['subdirName']
+emailSubject  = settings['emailSubject']
+domainName    = settings['domainName']
+emailUser     = settings['emailUser']
+emailPassword = settings['emailPassword']
+emailSmtp     = settings['emailSmtp']
+emailSmtpPort = settings['emailSmtpPort']
+    
+
+
 emailSession = None
-domainName = None
+
 
 def emailLogin(senderEmail, mypassword):
     global emailSession
-    emailSession = smtplib.SMTP("smtp.gmail.com", 587)
+    emailSession = smtplib.SMTP(emailSmtp, emailSmtpPort)
     emailSession.ehlo()
     emailSession.starttls()
     emailSession.ehlo
@@ -37,29 +51,6 @@ def emailStudent(senderEmail, studentUsername, subject, text):
 
 
 
-# See if there is a file that contains the information we need so we
-# don't need to prompt the user.
-CONFIG_FILE="ag-download.config"
-if os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE) as f:
-        exec(f.read())
-
-
-if not subdirName or not os.path.exists(subdirName):
-    print("Directory %s doesn't exist. Exiting." % str(subdirName))
-    exit(1)
-if not domainName:
-    print("Domain name not provided.")
-    exit(1)
-if not emailSubject:
-    print("Email subject missing.")
-    exit(1)
-if not emailUser:
-    print("Email username missing.")
-    exit(1)
-if not emailPassword:
-    print("Email password missing.")
-    exit(1)
 
 os.chdir(subdirName)
 cwd = os.getcwd()
@@ -67,6 +58,7 @@ dirs = [name for name in os.listdir(cwd) if os.path.isdir(os.path.join(cwd, name
 dirs.sort()
 
 # Login to email server
+print(emailUser)
 senderEmail = emailUser + '@' + domainName
 emailLogin(senderEmail, emailPassword)
 

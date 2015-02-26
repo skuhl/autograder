@@ -22,7 +22,7 @@ score_list=[]
 
 for d in dirs:
     metadataFile = d + "/AUTOGRADE.json"
-    metadata = []
+    metadata = {}
     if os.path.exists(metadataFile):
         with open(metadataFile, "r") as f:
             metadata = json.load(f)

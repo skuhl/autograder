@@ -63,7 +63,7 @@ emailLogin(senderEmail, emailPassword)
 for thisDir in dirs:
     agFilename = thisDir + "/AUTOGRADE.txt"
     metadataFile = thisDir + "/AUTOGRADE.json"
-    metadata = []
+    metadata = {}
     if os.path.exists(metadataFile):
         with open(metadataFile, "r") as f:
             metadata = json.load(f)

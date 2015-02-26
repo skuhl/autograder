@@ -188,7 +188,7 @@ class autograder():
         # can figure out exactly which submission the autograder
         # graded.
         metadataFile = os.path.join(self.workingDirectory, "AUTOGRADE.json")
-        metadata = []
+        metadata = {}
         if os.path.exists(metadataFile):
             with open(metadataFile, "r") as f:
                 metadata = json.load(f)
@@ -245,21 +245,16 @@ class autograder():
         shutil.move(self.logFile, logFileDestination)
         print("Wrote: %s" % logFileDestination)
 
-        meta
-
-        # Write an AUTOGRADE-DONE.txt file so we don't rerun the
-        # autograder on this submission. This AUTOGRADE-DONE file will
-        # then be erased once a new submission is downloaded.
-        doneDestination = os.path.join(self.directory, "AUTOGRADE-DONE.txt")
-        with open(doneDestination, "w") as f:
-            f.write("This submission was autograded at %s.\n" % str(datetime.datetime.now().ctime()))
-
-        # If we just regraded and AUTOGRADE-EMAILED.txt is present,
-        # delete AUTOGRADE-EMAILED.txt to ensure that the newest
-        # autograder run will be sent to the student.
-        emailedDestination = os.path.join(self.directory, "AUTOGRADE-EMAILED.txt")
-        if os.path.exists(emailedDestination):
-            os.remove(emailedDestination)
+        metadataFile = os.path.join(self.directory, "AUTOGRADE.json")
+        metadata = {}
+        if os.path.exists(metadataFile):
+            with open(metadataFile, "r") as f:
+                metadata = json.load(f)
+        metadata['emailSent'] = 0
+        metadata['emailSubject'] = ""
+        metadata['emailCtime'] = ""
+        with open(metadataFile, "w") as f:
+            json.dump(metadata, f, indent=4)
 
 
     def pristine(self):

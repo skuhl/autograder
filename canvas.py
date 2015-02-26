@@ -406,7 +406,7 @@ class canvas():
 
         # Get a copy of the metadata for this file
         metadataFile = destDir+".AUTOGRADE.json"
-        metadata = []
+        metadata = {}
         if os.path.exists(metadataFile):
             with open(metadataFile, "r") as f:
                 metadata = json.load(f)

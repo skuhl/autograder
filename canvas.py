@@ -416,31 +416,46 @@ class canvas():
         self.courseId = courseId;
 
     def downloadAssignment(self, courseName, assignmentName, subdirName):
+        # Find the course
         courses = self.getCourses()
         courseId = self.findCourseId(courses, courseName)
         if courseId == None:
-	        print("Failed to find course " + courseName);
-	        exit(1)
-        assignments = self.getAssignments(courseId=courseId)
+            print("Failed to find course " + courseName);
+            exit(1)
 
+        # Get a list of assignments
+        assignments = self.getAssignments(courseId=courseId)
+        
+        # Get a list of the students in the course
         students    = self.getStudents(courseId=courseId)
-        # Print that information
+
         #self.printCourseIds(courses)
         #self.printAssignmentIds(assignments)
         #self.printStudentIds(students)
+
+        # Find the assignment in the list of assignments
         assignmentId = self.findAssignmentId(assignments, assignmentName)
         if assignmentId == None:
-	        self.printAssignmentIds(assignments)
-	        print("Failed to find assignment " + assignmentName);
-	        exit(1)
+            self.printAssignmentIds(assignments)
+            print("Failed to find assignment " + assignmentName);
+            exit(1)
+
+        # Get the submissions for the assignment
         submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId)
+
+        # Filter out the submissions that we want to grade (newest, non-late submission)
         submissionsToGrade = self.findSubmissionsToGrade(submissions)
-        # print(submissionsToGrade)
-        self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)
-        if subdirName:
-            self.extractAllFiles(dir=subdirName,newSubdir=True)
-        else:
-            self.extractAllFiles()
+        self.prettyPrint(submissionsToGrade)
+
+        # Download the submissions
+        #self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)
+
+        # Assuming zip, tgz, or tar.gz files are submitted, extract
+        # them into subdirectories named after the student usernames.
+        #if subdirName:
+        #    self.extractAllFiles(dir=subdirName,newSubdir=True)
+        #else:
+        #    self.extractAllFiles()
 
 
 
@@ -452,7 +467,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-    canvas = Canvas()
+    canvas = canvas()
     courses = canvas.getCourses()
 
     for action in args.action:
@@ -498,17 +513,7 @@ if __name__ == "__main__":
 
 
         elif action == "assignmentDownload":
-            courseId = canvas.findCourseId(courses, args.course)
-            canvas.setDefaultCourseId(courseId)
-
-            assignments = canvas.getAssignments()
-            students = canvas.getStudents()
-
-            submissions = canvas.getSubmissions(assignmentId=assignmentId)
-            submissionsToGrade = canvas.findSubmissionsToGrade(submissions)
-            subdir="canvas-submissions"
-            canvas.downloadSubmissions(submissionsToGrade, students, dir=subdir)
-            canvas.extractAllFiles(dir=subdir,newSubdir=True)
+            canvas.downloadAssignment(args.course, args.assignment, "canvas-submissions")
 
         else:
             print("Unknown action: " + action)

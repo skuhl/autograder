@@ -392,8 +392,10 @@ class canvas():
         # Write the information about the submission to the
         # appropriate files.
         with open(destDir+"/AUTOGRADE-TIME.txt", "w") as myfile:
+            # Time that the file was downloaded from Canvas
             myfile.write(downloadTime+"\n")
         with open(destDir+"/AUTOGRADE-MD5SUM.txt", "w") as myfile:
+            # md5sum of the file downloaded form canvas
             myfile.write(md5sum+"\n")
             
     def printCourseIds(self, courses):

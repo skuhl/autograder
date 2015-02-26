@@ -393,7 +393,7 @@ class canvas():
                 tar.close()
                 os.remove(filename)
                 print(destDir + ": Extracted " + filename + " into " + destDir);
-            else if filename.endswith(".zip"):
+            elif filename.endswith(".zip"):
                 z = zipfile.ZipFile(filename)
                 z.extractall(path=destDir)
                 z.close()

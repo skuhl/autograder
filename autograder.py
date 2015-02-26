@@ -187,18 +187,30 @@ class autograder():
         # Add some basic information to AUTOGRADE.txt so that students
         # can figure out exactly which submission the autograder
         # graded.
-        timeFile = "AUTOGRADE-TIME.txt"
-        if os.path.exists(timeFile):
-            with open(timeFile, "r") as f:
-                contents = f.read()
-                self.log_addEntry("Submission was downloaded at approximately %s" % contents.strip())
-                self.log_addEntry("Time right now: %s" % str(datetime.datetime.now().ctime()))
+        metadataFile = os.path.join(self.workingDirectory, "AUTOGRADE.json")
+        metadata = []
+        if os.path.exists(metadataFile):
+            with open(metadataFile, "r") as f:
+                metadata = json.load(f)
 
-        md5File = "AUTOGRADE-MD5SUM.txt"
-        if os.path.exists(md5File):
-            with open(md5File, "r") as f:
-                contents = f.read()
-                self.log_addEntry("The file we downloaded from Canvas has md5sum: %s" % contents.strip())
+        self.log_addEntry("Autograder created this report at: %s" % str(datetime.datetime.now().ctime()))
+
+        if 'canvasSubmission' in metadata:
+            cs = metadata['canvasSubmission']
+            if 'submitted_at' in cs:
+                utc_dt = datetime.datetime.strptime(cs['submitted_at'],'%Y-%m-%dT%H:%M:%SZ')
+                dt = utc_dt.replace(tzinfo=datetime.timezone.utc).astimezone(tz=None)
+                self.log_addEntry("Using Canvas submission from: %s" % dt.ctime())
+            if 'attempt' in cs:
+                self.log_addEntry("This is attempt %d (if this is the first submission you made for this assignment, this number will be 1)" % cs['attempt'])
+            if 'filename' in cs:
+                self.log_addEntry("The file that you submitted was named: %s" % cs['filename'])
+        if 'md5sum' in metadata:
+            self.log_addEntry("The submitted file had md5sum: " + metadata['md5sum'])
+        if 'canvasStudent' in metadata:
+            cstudent = metadata['canvasStudent']
+            if 'short_name' in cs:
+                self.log_addEntry("Your name: " + cstudent['short_name'])
 
         # Adjust grade based on the contents of AUTOGRADE-MANUAL.txt
         # that the teacher may have added to the directory. This file
@@ -232,6 +244,8 @@ class autograder():
             os.remove(logFileDestination)
         shutil.move(self.logFile, logFileDestination)
         print("Wrote: %s" % logFileDestination)
+
+        meta
 
         # Write an AUTOGRADE-DONE.txt file so we don't rerun the
         # autograder on this submission. This AUTOGRADE-DONE file will

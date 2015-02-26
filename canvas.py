@@ -250,10 +250,13 @@ class canvas():
     @classmethod
     def prettyDate(obj, d, now):
         import datetime
+        print(now.tzinfo)
+        print(d.tzinfo)
         diff = now - d
         s = diff.seconds
         if diff.days > 7 or diff.days < 0:
-            return d.strftime('%Y-%m-%d')
+            local = d.astimezone(None)
+            return local.strftime('%Y-%m-%d')
         elif diff.days == 1:
             return ' 1 day ago'
         elif diff.days > 1:
@@ -271,9 +274,9 @@ class canvas():
         else:
             return '{:2d} hours ago'.format(int(s/3600))
 
-                
+
     def downloadSubmissions(self, submissions, students, dir="None"):
-        """Assumes that students submit one file (tgz.gz, zip, whatever is allowed) and downloads it into the given subdirectory."""
+        """Assumes that students submit one file (tgz.gz, zip, whatever is allowed) and downloads it into the given subdirectory. The submission should have only one attachment to it---the specific submission that we ant to download."""
         if not dir:
             dir = "."
         if not os.path.exists(dir):
@@ -287,23 +290,56 @@ class canvas():
                i['attachments'][0]['filename']:
                 student = self.findStudent(students, i['user_id'])
                 attachment = i['attachments'][0]
-                # self.prettyPrint(attachment)
                 filename = attachment['filename']
                 exten = os.path.splitext(filename)[1] # get filename extension
                 import datetime
-                d = datetime.datetime.strptime(i['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
+                utc_dt = datetime.datetime.strptime(i['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
+                utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
 
-                archiveFile  = os.path.join(dir,student['login_id']+exten)
-                subdirName   = os.path.join(dir,student['login_id'])
-                # Always delete existing stuff.
-                if os.path.exists(archiveFile):
-                    os.unlink(archiveFile)
-#                We will only extract into the students subdirectory if their submission changed.
-#                if os.path.exists(subdirName):
-#                    shutil.rmtree(subdirName)
+                # Create a new metadata record to potentially save
+                metadataNew = {
+                    "canvasSubmission":i,
+                    "canvasStudent":student }
 
-                print(student['name'] + " ("+student['login_id']+") submitted " + self.prettyDate(d, datetime.datetime.utcnow()))
-                urllib.request.urlretrieve(attachment['url'], dir+"/"+student['login_id']+exten)
+                # Look for an existing metadata file
+                metadataFile = None;
+                metadataFiles = [ os.path.join(dir,student['login_id']+".AUTOGRADE.json"),
+                                  os.path.join(dir,student['login_id'],"AUTOGRADE.json") ]
+                for mdf in metadataFiles:
+                    if os.path.exists(mdf):
+                        metadataFile = mdf
+                # Check if we need to download file based on metadata
+                if metadataFile:
+                    with open(metadataFile,"r") as f:
+                        metadataCache = json.load(f)
+                    cachedAttempt = metadataCache['canvasSubmission']['attempt']
+                    newAttempt = metadataNew['canvasSubmission']['attempt']
+                    if newAttempt > cachedAttempt:
+                        needDownload = True
+                    else:
+                        needDownload = False
+
+                else:
+                    needDownload = True
+
+
+                if needDownload:
+                    archiveFile  = os.path.join(dir,student['login_id']+exten)
+
+                    # Delete existing archive if it exists.
+                    toDelete = metadataFiles
+                    toDelete.append(archiveFile)
+                    for f in toDelete:
+                        if os.path.exists(archiveFile):
+                            os.unlink(archiveFile)
+                    # Download the file
+                    print(student['name'] + " ("+student['login_id']+") submitted " +
+                          self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)))
+                    urllib.request.urlretrieve(attachment['url'], dir+"/"+student['login_id']+exten)
+                    with open(metadataFiles[0], "w") as f:
+                        metadata_string = json.dump(metadataNew, f, indent=4)
+                else:
+                    print(student['name'] + " already have newest submission")
 
 
     def get_immediate_files(self, dir):
@@ -316,7 +352,8 @@ class canvas():
         print("Extracting all files into: " + dir)
         files = self.get_immediate_files(dir)
         for f in files:
-            self.extractFile(dir+"/"+f, dir, newSubdir)
+            if not f.endswith(".AUTOGRADE.json"):
+                self.extractFile(dir+"/"+f, dir, newSubdir)
 
     def extractFile(self, filename, dir, newSubdir=False):
         """Extracts filename into dir. If newSubdir is set, create an additional subdirectory inside of dir to extract the files into."""
@@ -327,11 +364,7 @@ class canvas():
             # name as the file but without the extension.
             destDir = os.path.splitext(filename)[0]
 
-        # Save some diagnostic information that we will write to the
-        # student's subdirectory. We will write this to
-        # AUTOGRADE-*.txt files after we have extracted the submitted
-        # zip file.
-        downloadTime = time.ctime(os.path.getmtime(filename))
+        # Calculate md5sum
         md5sum = ""
         with open(filename, 'rb') as fh:
             m = hashlib.md5()
@@ -342,62 +375,71 @@ class canvas():
                 m.update(data)
             md5sum = m.hexdigest()
 
-        # Check the md5sum of the downloaded file to see if it differs
-        # from the earlier submission.
-        needToExtract = True
-        if os.path.exists(destDir+"/AUTOGRADE-MD5SUM.txt"):
-            with open(destDir+"/AUTOGRADE-MD5SUM.txt", 'r') as f:
-                contents = f.read().strip()
-                if contents == md5sum:
-                    needToExtract = False
 
-        # If the file hasn't changed, nothing else to do...
-        if not needToExtract:
-            os.remove(filename)
-            print(destDir + ": Submission hasn't changed since last download.")
-            return
-
-        # If the file has changed, extract it.
-        print(destDir + ": Extracting " + filename + " into " + destDir);
         if os.path.exists(destDir):
             shutil.rmtree(destDir)
         try:
-            if tarfile.is_tarfile(filename):
+            # tarfile.is_tarfile() and zipfile.is_zipfile() functions
+            # are available, but sometimes it misidentifies files (for
+            # example .docx files are zip files.
+            if filename.endswith(".tar") or \
+               filename.endswith(".tar.gz") or  \
+               filename.endswith(".tar.bz2") or \
+               filename.endswith(".tbz") or \
+               filename.endswith(".tbz2") or \
+               filename.endswith(".tb2"):
                 tar = tarfile.open(filename)
                 tar.extractall(path=destDir)
                 tar.close()
                 os.remove(filename)
-            if zipfile.is_zipfile(filename):
-                zip = zipfile.ZipFile(filename)
-                zip.extractall(path=destDir)
-                zip.close()
+                print(destDir + ": Extracted " + filename + " into " + destDir);
+            else if filename.endswith(".zip"):
+                z = zipfile.ZipFile(filename)
+                z.extractall(path=destDir)
+                z.close()
                 os.remove(filename)
+                print(destDir + ": Extracted " + filename + " into " + destDir);
+            else:
+                print(destDir + ": No need to extract " + filename);
         except:
             print(destDir + ": Failed to extract file: "+filename)
 
-        # Look at extracted files:
-        onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
-        onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]
-        print(destDir + ": Contains %d file(s) and %d dir(s)"%(len(onlyfiles), len(onlydirs)))
-        # If submission included all files in a subdirectory, remove the subdirectory
-        if len(onlyfiles) == 0 and len(onlydirs) == 1:
-            print(destDir + ": Removing unnecessary subdirectory.")
-            shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
-            tmpDir = "/tmp/autograder-tmp-dir/"+onlydirs[0]
-            shutil.move(destDir+"/"+onlydirs[0], tmpDir)
-            for f in os.listdir(tmpDir):
-                shutil.move(tmpDir+"/"+f, destDir)
-            shutil.rmtree(tmpDir)
+        # Get a copy of the metadata for this file
+        metadataFile = destDir+".AUTOGRADE.json"
+        metadata = []
+        if os.path.exists(metadataFile):
+            with open(metadataFile, "r") as f:
+                metadata = json.load(f)
+        # add md5sum to metadata
+        metadata['md5sum']=md5sum
+        
+        # If subdirectory wasn't created, overwrite existing metadata file
+        if not os.path.exists(destDir):
+            with open(metadataFile, "w") as f:
+                json.dump(metadata, f, indent=4)
+        else: # If we did extract files into a subdirectory
+            # Remove unnecessary subdirectories
+            onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
+            onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]
+            print(destDir + ": Contains %d file(s) and %d dir(s)"%(len(onlyfiles), len(onlydirs)))
+            # If submission included all files in a subdirectory, remove the subdirectory
+            if len(onlyfiles) == 0 and len(onlydirs) == 1:
+                print(destDir + ": Removing unnecessary subdirectory.")
+                shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
+                tmpDir = "/tmp/autograder-tmp-dir/"+onlydirs[0]
+                shutil.move(destDir+"/"+onlydirs[0], tmpDir)
+                for f in os.listdir(tmpDir):
+                    shutil.move(tmpDir+"/"+f, destDir)
+                shutil.rmtree(tmpDir)
 
-        # Write the information about the submission to the
-        # appropriate files.
-        with open(destDir+"/AUTOGRADE-TIME.txt", "w") as myfile:
-            # Time that the file was downloaded from Canvas
-            myfile.write(downloadTime+"\n")
-        with open(destDir+"/AUTOGRADE-MD5SUM.txt", "w") as myfile:
-            # md5sum of the file downloaded form canvas
-            myfile.write(md5sum+"\n")
-            
+            # Remove original metadata file, write one out in the
+            # subdirectory.
+            metadataFileDestDir = os.path.join(destDir,"AUTOGRADE.json")
+            os.remove(metadataFile)
+            with open(metadataFileDestDir, "w") as f:
+                json.dump(metadata, f, indent=4)
+
+
     def printCourseIds(self, courses):
         for i in courses:
             print("%10s \"%s\""%(str(i['id']), i['name']))
@@ -445,17 +487,16 @@ class canvas():
 
         # Filter out the submissions that we want to grade (newest, non-late submission)
         submissionsToGrade = self.findSubmissionsToGrade(submissions)
-        self.prettyPrint(submissionsToGrade)
 
         # Download the submissions
-        #self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)
+        self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)
 
         # Assuming zip, tgz, or tar.gz files are submitted, extract
         # them into subdirectories named after the student usernames.
-        #if subdirName:
-        #    self.extractAllFiles(dir=subdirName,newSubdir=True)
-        #else:
-        #    self.extractAllFiles()
+        if subdirName:
+            self.extractAllFiles(dir=subdirName,newSubdir=True)
+        else:
+            self.extractAllFiles()
 
 
 

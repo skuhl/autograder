@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os
+import sys, os, json
 import datetime, smtplib
 import autograder
 
@@ -50,40 +50,42 @@ def emailStudent(senderEmail, studentUsername, subject, text):
     emailSession.sendmail(senderEmail, recipients, headers + "\r\n\r\n" + body)
 
 
-
-
 os.chdir(subdirName)
 cwd = os.getcwd()
 dirs = [name for name in os.listdir(cwd) if os.path.isdir(os.path.join(cwd, name))]
 dirs.sort()
 
 # Login to email server
-print(emailUser)
 senderEmail = emailUser + '@' + domainName
 emailLogin(senderEmail, emailPassword)
 
 # send email messages
 for thisDir in dirs:
     agFilename = thisDir + "/AUTOGRADE.txt"
-    agEmailedFilename = thisDir + "/AUTOGRADE-EMAILED.txt"
-
+    metadataFile = thisDir + "/AUTOGRADE.json"
+    metadata = []
+    if os.path.exists(metadataFile):
+        with open(metadataFile, "r") as f:
+            metadata = json.load(f)
+    if 'emailSent' in metadata and metadata['emailSent'] == 1:
+        print(thisDir + " SKIPPING - Already emailed a report.")
+        continue;
     if not os.path.exists(agFilename):
         print(thisDir + " SKIPPING - AUTOGRADE.txt is missing.")
         continue;
-    if os.path.exists(agEmailedFilename):
-        print(thisDir + " SKIPPING - AUTOGRADE-EMAILED.txt is present; report has already been emailed.")
-        continue;
-    # We don't care if AUTOGRADE-DONE.txt is present since that is
-    # only used to determine if we need to rerun the autograder---not
-    # to determine if we need to email them or not.
 
     print("Sending message to: "+thisDir+"@"+domainName)
     with open(agFilename, 'r') as content_file:
         content = content_file.read()
-    emailStudent(senderEmail, thisDir, emailSubject, content)
+    # emailStudent(senderEmail, thisDir, emailSubject, content)
 
     with open(agEmailedFilename, "w") as f:
         f.write("We emailed this student the autograder report at "+str(datetime.datetime.now().ctime()) + " with the subject: " + emailSubject + "\n")
-
+    metadata['emailSubject'] = emailSubject
+    metadata['emailCtime'] = str(datetime.datetime.now().ctime)
+    metadata['emailSent']=1
+    with open(metadataFile, "w") as f:
+        json.dump(metadata, f, indent=4)
+        
 # logout
 emailLogout()

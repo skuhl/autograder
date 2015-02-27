@@ -382,6 +382,7 @@ class canvas():
             # example .docx files are zip files.
             if filename.endswith(".tar") or \
                filename.endswith(".tar.gz") or  \
+               filename.endswith(".tgz") or \
                filename.endswith(".tar.bz2") or \
                filename.endswith(".tbz") or \
                filename.endswith(".tbz2") or \

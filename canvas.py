@@ -250,8 +250,6 @@ class canvas():
     @classmethod
     def prettyDate(obj, d, now):
         import datetime
-        print(now.tzinfo)
-        print(d.tzinfo)
         diff = now - d
         s = diff.seconds
         if diff.days > 7 or diff.days < 0:

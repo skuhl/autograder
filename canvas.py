@@ -184,41 +184,65 @@ class canvas():
             return int(course['id'])
         return None
 
-    def findSubmissionsToGrade(self, submissions):
-        """Returns the newest non-late submission."""
+    def isSubmissionLate(self, submission):
+        if submission['late']:
+            return True
+        else:
+            return False
+
+    def isSubmissionNewest(self, submission, submission_history):
+        for s in submission_history:
+            if s['attempt'] > submission['attempt']:
+                return False
+        return True
+
+    def isSubmissionNewestNonLate(self, submission, submission_history):
+        if submission['late']:
+            return False
+
+        # Look for a non-late submission in the history with a greater
+        # attempt number.
+        for s in submission_history:
+            if s['late']:
+                continue
+            if s['attempt'] > submission['attempt']:
+                return False
+        return True
+    
+    def findSubmissionsToGrade(self, submissions, attempt=-1):
+        """Returns newest non-late submissions. If attempt is set, only return the submissions with that attempt number."""
         goodSubmissions = []
 
         # submissions must be grouped by student and include submission history
+
+        # For each student, get the student submission history.
         for studentSubmit in submissions:
-            newestOnTimeAttempt = 0
-            newestOnTimeSubmission = None
+            allHistory = []
             if len(studentSubmit['submissions']) > 0:
                 allHistory = studentSubmit['submissions'][0]['submission_history']
-            else:
-                allHistory = []
-            
 
+            toGrade = None
             for hist in allHistory:
-                # hist['attempt'] is actually set to null if we have already
+                # hist['attempt'] is set to null if we have already
                 # graded something that hasn't been submitted.
-                if not hist['late'] and hist['attempt'] and hist['attempt'] >= newestOnTimeAttempt:
-                    newestOnTimeAttempt = hist['attempt']
-                    newestOnTimeSubmission = hist
+                if not hist['attempt']:
+                    continue
+                if attempt <= 0:
+                    if self.isSubmissionNewestNonLate(hist, allHistory):
+                        toGrade = hist
+                else:
+                    if attempt == hist['attempt']:
+                        toGrade = hist
 
-            # If no on-time submission, just accept the late
-            # submission
-#            if not newestOnTimeSubmission:
-#                for hist in allHistory:
-#                    if hist['attempt'] and hist['attempt'] > newestOnTimeAttempt:
-#                        newestOnTimeAttempt = hist['attempt']
-#                        newestOnTimeSubmission = hist
+            # Add the submission for this student that we want to
+            # grade to the list.
+            if toGrade:
+                goodSubmissions.append(toGrade)
 
-            # If there was no submission, a submission object for the
-            # student will be returned that has 'attempt: null'.
-            #if not newestOnTimeSubmission and len(allHistory) > 0:
-            #    newestOnTimeSubmission = allHistory[0]
-            goodSubmissions.append(newestOnTimeSubmission)
+        if len(goodSubmissions) == 0:
+            print("WARNING: Unable to find any matching submissions.")
         return goodSubmissions
+
 
     def printSubmissionSummary(self, submissions, students):
         """Prints a summary of all of the submissions."""
@@ -272,9 +296,79 @@ class canvas():
         else:
             return '{:2d} hours ago'.format(int(s/3600))
 
+    def downloadSubmission(self, submission, student, directory):
+        """Downloads a specific submission from a student into a directory."""
 
-    def downloadSubmissions(self, submissions, students, dir="None"):
-        """Assumes that students submit one file (tgz.gz, zip, whatever is allowed) and downloads it into the given subdirectory. The submission should have only one attachment to it---the specific submission that we ant to download."""
+        attachment = submission['attachments'][0]
+        filename = attachment['filename']
+        exten = os.path.splitext(filename)[1] # get filename extension
+        import datetime
+        utc_dt = datetime.datetime.strptime(submission['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
+        utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
+
+        # Create a new metadata record to potentially save
+        metadataNew = {
+            "canvasSubmission":submission,
+            "canvasStudent":student }
+
+        # Look for an existing metadata file
+        login = student['login_id']
+        metadataFile = None;
+        metadataFiles = [ os.path.join(directory,login+".AUTOGRADE.json"),
+                          os.path.join(directory,login,"AUTOGRADE.json") ]
+        for mdf in metadataFiles:
+            if os.path.exists(mdf):
+                metadataFile = mdf
+
+        # Check if we need to download file based on metadata
+        metadataCache = {}
+        if metadataFile:
+            with open(metadataFile,"r") as f:
+                metadataCache = json.load(f)
+
+        # Gather metadata and make assumptions if metadata file is missing:
+        if "locked" not in metadataCache:
+            print("%-12s Assuming cached copy is unlocked." % login)
+        locked = metadataCache.get("locked", 0)
+
+        if 'canvasSubmission' not in metadataCache or \
+           'attempt' not in metadataCache['canvasSubmission']:
+            print("%-12s Assuming cached submission is attempt 0" % login)
+            cachedAttempt = 0
+        else:
+            cachedAttempt = metadataCache['canvasSubmission']['attempt']
+        newAttempt = metadataNew['canvasSubmission']['attempt']
+
+        # Determine if we should download the submission or not
+        if locked:
+            print("%-12s skipping download because submission is locked." % login)
+            return
+        if newAttempt <= cachedAttempt:
+            print("%-12s is up to date" % login)
+            return
+
+        archiveFile  = os.path.join(directory,login+exten)
+
+        # Delete existing archive if it exists.
+        toDelete = metadataFiles
+        toDelete.append(archiveFile)
+        for f in toDelete:
+            if os.path.exists(archiveFile):
+                os.unlink(archiveFile)
+        # Download the file
+        print("%-12s downloading attempt %d submitted %s" % (login, newAttempt, 
+              self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))))
+        urllib.request.urlretrieve(attachment['url'], directory+"/"+login+exten)
+
+        # Write the new metadata out to a file
+        metadataNew['locked']=0
+        with open(metadataFiles[0], "w") as f:
+            metadata_string = json.dump(metadataNew, f, indent=4)
+        
+        
+
+    def downloadSubmissions(self, submissions, students, dir=None):
+        """Downloads submissions each of the students. Assumes that students submit one file (tgz.gz, zip, whatever is allowed). Files will be downloaded into the given subdirectory."""
         if not dir:
             dir = "."
         if not os.path.exists(dir):
@@ -287,57 +381,9 @@ class canvas():
                i['attachments'][0]['url'] and \
                i['attachments'][0]['filename']:
                 student = self.findStudent(students, i['user_id'])
-                attachment = i['attachments'][0]
-                filename = attachment['filename']
-                exten = os.path.splitext(filename)[1] # get filename extension
-                import datetime
-                utc_dt = datetime.datetime.strptime(i['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
-                utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
+                if student:
+                    self.downloadSubmission(i, student, dir)
 
-                # Create a new metadata record to potentially save
-                metadataNew = {
-                    "canvasSubmission":i,
-                    "canvasStudent":student }
-
-                # Look for an existing metadata file
-                metadataFile = None;
-                metadataFiles = [ os.path.join(dir,student['login_id']+".AUTOGRADE.json"),
-                                  os.path.join(dir,student['login_id'],"AUTOGRADE.json") ]
-                for mdf in metadataFiles:
-                    if os.path.exists(mdf):
-                        metadataFile = mdf
-                # Check if we need to download file based on metadata
-                if metadataFile:
-                    with open(metadataFile,"r") as f:
-                        metadataCache = json.load(f)
-                    cachedAttempt = metadataCache['canvasSubmission']['attempt']
-                    newAttempt = metadataNew['canvasSubmission']['attempt']
-                    if newAttempt > cachedAttempt:
-                        needDownload = True
-                    else:
-                        needDownload = False
-
-                else:
-                    needDownload = True
-
-
-                if needDownload:
-                    archiveFile  = os.path.join(dir,student['login_id']+exten)
-
-                    # Delete existing archive if it exists.
-                    toDelete = metadataFiles
-                    toDelete.append(archiveFile)
-                    for f in toDelete:
-                        if os.path.exists(archiveFile):
-                            os.unlink(archiveFile)
-                    # Download the file
-                    print(student['name'] + " ("+student['login_id']+") submitted " +
-                          self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)))
-                    urllib.request.urlretrieve(attachment['url'], dir+"/"+student['login_id']+exten)
-                    with open(metadataFiles[0], "w") as f:
-                        metadata_string = json.dump(metadataNew, f, indent=4)
-                else:
-                    print(student['name'] + " already have newest submission")
 
 
     def get_immediate_files(self, dir):
@@ -456,7 +502,7 @@ class canvas():
             print("Warning: You are setting the default courseId to None.")
         self.courseId = courseId;
 
-    def downloadAssignment(self, courseName, assignmentName, subdirName):
+    def downloadAssignment(self, courseName, assignmentName, subdirName, userid=None, attempt=-1):
         # Find the course
         courses = self.getCourses()
         courseId = self.findCourseId(courses, courseName)
@@ -469,6 +515,12 @@ class canvas():
         
         # Get a list of the students in the course
         students    = self.getStudents(courseId=courseId)
+        # Filter that list down to the requested student
+        if userid:
+            students = [ student for student in students if userid==student['login_id']]
+            if len(students) == 0:
+                print("No matching student for userid %s" % userid)
+                exit(1)
 
         #self.printCourseIds(courses)
         #self.printAssignmentIds(assignments)
@@ -482,10 +534,15 @@ class canvas():
             exit(1)
 
         # Get the submissions for the assignment
-        submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId)
+        if userid:
+            studentId = students[0]['id']
+        else:
+            studentId = None
+        
+        submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId, studentId=studentId)
 
         # Filter out the submissions that we want to grade (newest, non-late submission)
-        submissionsToGrade = self.findSubmissionsToGrade(submissions)
+        submissionsToGrade = self.findSubmissionsToGrade(submissions, attempt)
 
         # Download the submissions
         self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)

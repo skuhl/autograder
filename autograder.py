@@ -26,6 +26,10 @@ class config():
         if os.path.exists(self.configfile):
             with open(self.configfile, "r") as f:
                 self.settings = json.load(f)
+        else:
+            print("autograde-config.json file is missing.")
+            exit(1)
+        
 
     def get(self):
         return self.settings

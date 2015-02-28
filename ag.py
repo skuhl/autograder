@@ -130,7 +130,11 @@ def emailLogout():
     emailSession.quit()
 
 def emailStudent(senderEmail, studentUsername, subject, text):
-    recipients = [ studentUsername + "@" + domainName ]   # list of recipients
+    if '@' in studentUsername:
+        recipients = [ studentUsername ]
+    else:
+        recipients = [ studentUsername + "@" + domainName ]   # list of recipients
+    
     body = text  # body of message
     headers = ["From: " + senderEmail,
                "Subject: " + subject,
@@ -161,10 +165,10 @@ def emailSend(dirs):
             print("%-12s SKIPPING - AUTOGRADE.txt is missing." % thisDir)
             continue;
 
-        print("%-12s Sending message to: %s" % (thisDir, thisDir+"@"+domainName))
+        print("%-12s Sending message to: %s" % (thisDir, thisDir))
         with open(agFilename, 'r') as content_file:
             content = content_file.read()
-            # emailStudent(senderEmail, thisDir, emailSubject, content)
+            emailStudent(senderEmail, thisDir, emailSubject, content)
 
         metadata['emailSubject'] = emailSubject
         metadata['emailCtime'] = str(datetime.datetime.now().ctime)

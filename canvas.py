@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Author: Scott Kuhl
-import json, urllib.request
+import json, urllib.request, urllib.parse
 import textwrap
 import sys,shutil,os,time,hashlib,re
 from pprint import pprint
@@ -48,17 +48,17 @@ class canvas():
             exit()
         self.courseId = courseId
 
-    def makeRequest(self,request):
+    def makeRequest(self,url):
         """Makes the given request (passes token as header)"""
         try:
-            # Tack on http://.../ to the beginning of the request if needed
-            if self.CANVAS_API not in request:
-                requestString = self.CANVAS_API+request
+            # Tack on http://.../ to the beginning of the url if needed
+            if self.CANVAS_API not in url:
+                urlString = self.CANVAS_API+url
             else:
-                requestString = request
+                urlString = url
         
-            print("Sending request: " +requestString)
-            request = urllib.request.Request(requestString)
+            print("Requesting: " +urlString)
+            request = urllib.request.Request(urlString)
             request.add_header("Authorization", "Bearer " + self.CANVAS_TOKEN);
             response = urllib.request.urlopen(request)
             json_string = response.readall().decode('utf-8');
@@ -87,12 +87,40 @@ class canvas():
             print(e)
             raise
 
+    def makePut(self,url):
+        """Puts data to Canvas (passes token as header)"""
+        try:
+            # Tack on http://.../ to the beginning of the url if needed
+            if self.CANVAS_API not in url:
+                urlString = self.CANVAS_API+url
+            else:
+                urlString = url
+        
+            print("Putting: " +urlString)
+            request = urllib.request.Request(urlString, method='PUT')
+            request.add_header("Authorization", "Bearer " + self.CANVAS_TOKEN);
+            response = urllib.request.urlopen(request)
+            #print(response.readall().decode('utf-8'))
+            # json_string = response.readall().decode('utf-8');
+            # retVal = json.loads(json_string)
+            if(response.status == 200):
+                return True
+            else:
+                return False
+        except:
+            e = sys.exc_info()[0]
+            print(e)
+            raise
+
+
     def prettyPrint(self,data):
         print(json.dumps(data, sort_keys=True, indent=4))
 
     def getCourses(self):
         """Gets course objects"""
-        allCourses = self.makeRequest("courses?per_page=100&page=1")
+        allCourses = self.makeRequest("courses?"+
+                                      urllib.parse.urlencode({"per_page":"100",
+                                                              "page": "1"}))
         return allCourses
 
     def getStudents(self, courseId=None):
@@ -106,9 +134,27 @@ class canvas():
     def getAssignments(self, courseId=None):
         """Gets list of assignments in a course."""
         courseId = courseId or self.courseId
-        allAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?per_page=100&page=1")
+        allAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?"+
+                                          urllib.parse.urlencode({"per_page":"100",
+                                                                  "page": "1"}))
         return allAssignments
 
+    def commentOnSubmission(self, courseId, assignmentId, studentId, comment):
+        courseId = courseId or self.courseId
+        if courseId == None:
+            print("Can't get comment on submissions without a courseId.")
+            exit(1)
+        if assignmentId == None or studentId == None:
+            printf("Can't comment on a submission without a assignment ID and a student ID.")
+            exit(1)
+
+        
+        self.makePut("courses/"+str(courseId)+
+                     "/assignments/"+str(assignmentId)+
+                     "/submissions/"+str(studentId)+"?"+
+                     urllib.parse.urlencode({"comment[text_comment]" : comment}))
+
+    
     def getSubmissions(self, courseId=None, assignmentId=None, studentId=None):
         """Gets all submissions for a course, all submissions for a student in a course, or all submissions for a specific assignment+student combination."""
         courseId = courseId or self.courseId
@@ -296,7 +342,7 @@ class canvas():
         else:
             return '{:2d} hours ago'.format(int(s/3600))
 
-    def downloadSubmission(self, submission, student, directory):
+    def downloadSubmission(self, submission, student, directory, group_memberships={}):
         """Downloads a specific submission from a student into a directory."""
 
         attachment = submission['attachments'][0]
@@ -306,13 +352,22 @@ class canvas():
         utc_dt = datetime.datetime.strptime(submission['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
         utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
 
-        # Create a new metadata record to potentially save
+        # Create a new metadata record to save
         metadataNew = {
             "canvasSubmission":submission,
             "canvasStudent":student }
 
-        # Look for an existing metadata file
+        # Figure out if the name of the downloaded file/subdirectory
+        # should be based on their username or group name (if there is
+        # a set of groups associated with this assignment.)
         login = student['login_id']
+        if student['login_id'] in group_memberships:
+            (group, usersInGroup) = group_memberships[student['login_id']]
+            metadataNew['canvasGroup'] = group
+            metadataNew['canvasStudentsInGroup'] = usersInGroup
+            login = group['name']
+
+        # Look for an existing metadata file
         metadataFile = None;
         metadataFiles = [ os.path.join(directory,login+".AUTOGRADE.json"),
                           os.path.join(directory,login,"AUTOGRADE.json") ]
@@ -367,7 +422,7 @@ class canvas():
         
         
 
-    def downloadSubmissions(self, submissions, students, dir=None):
+    def downloadSubmissions(self, submissions, students, dir=None, group_memberships={}):
         """Downloads submissions each of the students. Assumes that students submit one file (tgz.gz, zip, whatever is allowed). Files will be downloaded into the given subdirectory."""
         if not dir:
             dir = "."
@@ -382,7 +437,7 @@ class canvas():
                i['attachments'][0]['filename']:
                 student = self.findStudent(students, i['user_id'])
                 if student:
-                    self.downloadSubmission(i, student, dir)
+                    self.downloadSubmission(i, student, dir, group_memberships)
 
 
 
@@ -533,6 +588,17 @@ class canvas():
             print("Failed to find assignment " + assignmentName);
             exit(1)
 
+        # Crate a dictionary to map usernames to (group, usersInGroup)
+        group_memberships = {}
+        assignment = self.findAssignment(assignments, assignmentName)
+        assignmentGroupCat = assignment['group_category_id']
+        if assignmentGroupCat:
+            assignmentGroups = self.makeRequest("group_categories/"+str(assignmentGroupCat)+"/groups")
+            for g in assignmentGroups:
+                usersInGroup = self.makeRequest("groups/"+str(g['id'])+"/users")
+                for u in usersInGroup:
+                    group_memberships[u['login_id']] = (g, usersInGroup);
+
         # Get the submissions for the assignment
         if userid:
             studentId = students[0]['id']
@@ -545,7 +611,7 @@ class canvas():
         submissionsToGrade = self.findSubmissionsToGrade(submissions, attempt)
 
         # Download the submissions
-        self.downloadSubmissions(submissionsToGrade, students, dir=subdirName)
+        self.downloadSubmissions(submissionsToGrade, students, subdirName, group_memberships)
 
         # Assuming zip, tgz, or tar.gz files are submitted, extract
         # them into subdirectories named after the student usernames.

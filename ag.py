@@ -48,7 +48,7 @@ def regrade(dirs):
     for thisDir in dirs:
         agfile = os.path.join(thisDir, "AUTOGRADE.txt")
         if os.path.exists(agfile):
-            os.unlink(filename)
+            os.unlink(agfile)
 def removeELFs():
     # Look for ELF executables the user might have submitted and remove them!
     for dirpath, dnames, fnames in os.walk(subdirName):
@@ -236,7 +236,9 @@ elif sys.argv[1] == 'email':
         emailSend(sys.argv[2:])
     else:
         emailSend(dirs)
-
+else:
+    print("Unknown action: %s" % sys.argv[1])
+    exit(1)
 
 
 

@@ -59,6 +59,8 @@ dirs = [name for name in os.listdir(subdirName) if os.path.isdir(os.path.join(su
 dirs.sort()
 os.chdir(subdirName)
 
+if len(sys.argv) > 1:
+    dirs = sys.argv[1:]
 
 
 # For each subdirectory (i.e., student)

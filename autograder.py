@@ -211,10 +211,15 @@ class autograder():
                 self.log_addEntry("The file that you submitted was named: %s" % cs['filename'])
         if 'md5sum' in metadata:
             self.log_addEntry("The submitted file had md5sum: " + metadata['md5sum'])
-        if 'canvasStudent' in metadata:
-            cstudent = metadata['canvasStudent']
-            if 'short_name' in cs:
-                self.log_addEntry("Your name: " + cstudent['short_name'])
+
+        # Put submitter's name or group name in report
+        if 'canvasGroup' in metadata and \
+           'name' in metadata['canvasGroup']:
+            self.log_addEntry("Your group name: " + metadata['canvasGroup']['name'])
+        else: # if not a group assignment
+            if 'canvasStudent' in metadata and \
+               'short_name' in metadata['canvasStudent']:
+                self.log_addEntry("Your name: " + metadata['canvasStudent']['short_name'])
 
         # Adjust grade based on the contents of AUTOGRADE-MANUAL.txt
         # that the teacher may have added to the directory. This file

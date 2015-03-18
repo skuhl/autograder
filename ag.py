@@ -71,7 +71,7 @@ def regrade(dirs):
         if os.path.exists(agfile):
             os.unlink(agfile)
 
-def emailCacheClear(dirs):
+def emailClearCache(dirs):
     for thisDir in dirs:
         metadataFile = thisDir + "/AUTOGRADE.json"
         metadata = {}
@@ -256,12 +256,12 @@ elif sys.argv[1] == 'regrade':
         regrade(sys.argv[2:])
     else:
         regrade(dirs)
-elif sys.argv[1] == 'emailCacheClear':
+elif sys.argv[1] == 'emailClearCache':
     os.chdir(subdirName)        
     if len(sys.argv) > 2:
-        emailCacheClear(sys.argv[2:])
+        emailClearCache(sys.argv[2:])
     else:
-        emailCacheClear(dirs)
+        emailClearCache(dirs)
 
 elif sys.argv[1] == 'stats' or sys.argv[1] == 'stat':
     os.chdir(subdirName)

@@ -73,7 +73,7 @@ A submission will only be graded if an AUTOGRADE.txt grade report is missing. If
 A note about email
 ---------------
 
-The *ag.py email* command will email autograder reports to students. It does not send the student a report if they have already received a copy of that report. Specifically, "ag-grade.py" will set a flag in the json metadata file for that submission indicating that an email has not been sent whenever a submission is autograded. As a result, you can download and email students repeatedly: Only new submissions will be downloaded and only the emails that need to get sent will get sent. You can run *ag.py emailAgain* if you want the system to assume that no students have been emailed reports previously.
+The *ag.py email* command will email autograder reports to students. It does not send the student a report if they have already received a copy of that report. Specifically, "ag-grade.py" will set a flag in the json metadata file for that submission indicating that an email has not been sent whenever a submission is autograded. As a result, you can download and email students repeatedly: Only new submissions will be downloaded and only the emails that need to get sent will get sent. You can run *ag.py emailCacheClear* if you want the system to assume that no students have been emailed reports previously.
 
 If there are a group of students associated with a submission, the email will be sent to each student in the group.
 

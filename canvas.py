@@ -500,6 +500,12 @@ class canvas():
                 os.remove(filename)
                 print(destDir + ": Extracted " + filename + " into " + destDir);
             else:
+                # Comment out the following lines to prevent single
+                # file submissions from getting put into
+                # subdirectories. Removing this line may break a
+                # variety of different elements of the autograder.
+                os.mkdir(destDir)
+                shutil.move(filename, destDir)
                 print(destDir + ": No need to extract " + filename);
         except:
             print(destDir + ": Failed to extract file: "+filename)

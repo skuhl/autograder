@@ -10,12 +10,33 @@ if sys.hexversion < 0x030000F0:
 if len(sys.argv) < 2:
     print("Usage: ag.py action [args]")
     print("Each action allows can be passed an optional argument:")
+
+    print()
+    print(" download [username attempt#]")
+    print("     Download the any updated submissions (ignoring late submissions)")
+
+    print()
+    print(" stats [usernames...]")
+    print("     Display basic statistics about submissions")
+    
+    print()
     print(" email [usernames...]")
+    print("     Sends emails containing the AUTOGRADE.txt reports to students as needed.")
+
+    print()
     print(" lock [usernames...]")
     print(" unlock [usernames...]")
+    print("     Lock or unlock submissions so subsequent downloads won't overwrite the submissions for one or more students.")
+
+    print()
     print(" regrade [usernames...]")
-    print(" stats [usernames...]")
-    print(" download [username attempt#]")
+    print("     Erase all AUTOGRADE.txt files to force complete regrading. Useful when the ag-grade.py script is changed by the instructor.")
+    
+    print()
+    print(" emailClearCache [usernames...]")
+    print("     Forces new emails to get sent to all students (this option is usually only useful for debugging the autograder)")
+
+    sys.exit(1)
 
 config = autograder.config()
 settings = config.get()
@@ -49,6 +70,20 @@ def regrade(dirs):
         agfile = os.path.join(thisDir, "AUTOGRADE.txt")
         if os.path.exists(agfile):
             os.unlink(agfile)
+
+def emailCacheClear(dirs):
+    for thisDir in dirs:
+        metadataFile = thisDir + "/AUTOGRADE.json"
+        metadata = {}
+        if os.path.exists(metadataFile):
+            with open(metadataFile, "r") as f:
+                metadata = json.load(f)
+        metadata['emailSent']=0
+        with open(metadataFile, "w") as f:
+            json.dump(metadata, f, indent=4)
+    
+
+
 def removeELFs():
     # Look for ELF executables the user might have submitted and remove them!
     for dirpath, dnames, fnames in os.walk(subdirName):
@@ -165,10 +200,24 @@ def emailSend(dirs):
             print("%-12s SKIPPING - AUTOGRADE.txt is missing." % thisDir)
             continue;
 
-        print("%-12s Sending message to: %s" % (thisDir, thisDir))
-        with open(agFilename, 'r') as content_file:
-            content = content_file.read()
-            emailStudent(senderEmail, thisDir, emailSubject, content)
+        emailToAddr = thisDir
+
+        # If there is metadata file, get the name of the submitter
+        if metadata.get("canvasStudent", False):
+            emailToAddr = metadata['canvasStudent']['login_id']
+
+        group = metadata.get("canvasStudentsInGroup", None)
+        if group:
+            for student in group:
+                print("%-12s NOT Sending message to group member %s" % (thisDir, student['login_id']))
+                with open(agFilename, 'r') as content_file:
+                    content = content_file.read()
+                    emailStudent(senderEmail, student['login_id'], emailSubject, content)
+        else:
+            print("%-12s NOT Sending message to %s" % (thisDir, emailToAddr))
+            with open(agFilename, 'r') as content_file:
+                content = content_file.read()
+                emailStudent(senderEmail, thisDir, emailToAddr, content)
 
         metadata['emailSubject'] = emailSubject
         metadata['emailCtime'] = str(datetime.datetime.now().ctime)
@@ -207,6 +256,13 @@ elif sys.argv[1] == 'regrade':
         regrade(sys.argv[2:])
     else:
         regrade(dirs)
+elif sys.argv[1] == 'emailCacheClear':
+    os.chdir(subdirName)        
+    if len(sys.argv) > 2:
+        emailCacheClear(sys.argv[2:])
+    else:
+        emailCacheClear(dirs)
+
 elif sys.argv[1] == 'stats' or sys.argv[1] == 'stat':
     os.chdir(subdirName)
     if len(sys.argv) > 2:

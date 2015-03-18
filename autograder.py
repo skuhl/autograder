@@ -259,6 +259,10 @@ class autograder():
         if os.path.exists(metadataFile):
             with open(metadataFile, "r") as f:
                 metadata = json.load(f)
+
+        # Since we just generated a new AUTOGRADE.txt file, we need to
+        # make sure that we would email the new report the next time
+        # students are emailed:
         metadata['emailSent'] = 0
         metadata['emailSubject'] = ""
         metadata['emailCtime'] = ""

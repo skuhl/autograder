@@ -74,7 +74,7 @@ for thisDir in dirs:
     ag = autograder.autograder("AUTOGRADE.txt", thisDir)
 
     # Verify that the files are there that we are expecting and look for unexpected files.
-    ag.expect_only_files(["makefile", "Makefile", "*.c", "*.cpp", "*.h", "README", "README.txt", "AUTOGRADE*.txt"], 1)
+    ag.expect_only_files(["makefile", "Makefile", "*.c", "*.cpp", "*.h", "README", "README.txt", "AUTOGRADE*.txt" "AUTOGRADE.json"], 1)
     ag.find_unexpected_subdirectories([], 1)
     ag.expect_file_one_of(["*.c", "*.C", "*.cpp"], 1)
     ag.expect_file_one_of(["makefile", "Makefile"], 5)

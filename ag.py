@@ -143,12 +143,19 @@ def stats(dirs):
         print("%-12s %3s %14s %5d %5s %5s %5s" % (d, score, timeString, attempt, late, locked, emailed))
 
     print("Submission count: %d" % len(dirs))
+    try:
+        import numpy
+        average = str(numpy.average(score_list))
+        median = str(numpy.median(score_list))
+    except ImportError:
+        average = "?"
+        media = "?"
+        print("Install numpy for full statistics information.")
+        
     if len(score_list) > 0:
-        print("Low/average/median/high score: %d/%d/%d/%d" % (min(score_list),
-                                                              numpy.average(score_list),
-                                                              numpy.median(score_list),
+        print("Low/average/median/high score: %d/%s/%s/%d" % (min(score_list),
+                                                              average, median,
                                                               max(score_list)))
-
 emailSession = None
 
 
@@ -209,12 +216,12 @@ def emailSend(dirs):
         group = metadata.get("canvasStudentsInGroup", None)
         if group:
             for student in group:
-                print("%-12s NOT Sending message to group member %s" % (thisDir, student['login_id']))
+                print("%-12s Sending message to group member %s" % (thisDir, student['login_id']))
                 with open(agFilename, 'r') as content_file:
                     content = content_file.read()
                     emailStudent(senderEmail, student['login_id'], emailSubject, content)
         else:
-            print("%-12s NOT Sending message to %s" % (thisDir, emailToAddr))
+            print("%-12s Sending message to %s" % (thisDir, emailToAddr))
             with open(agFilename, 'r') as content_file:
                 content = content_file.read()
                 emailStudent(senderEmail, thisDir, emailToAddr, content)

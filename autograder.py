@@ -8,6 +8,7 @@ import string
 import signal
 import time,datetime
 import json
+import tempfile
 
 class bcolors:
     FAIL = '\033[91m\033[1m'  # red, bold
@@ -86,19 +87,19 @@ class Command(object):
             
             try:
             # write stderr/stdout to temp file in case students print tons of stuff out.
-                with open("AUTOGRADE-STDOUT-TEMP-FILE.txt", 'w') as fo:
-                    with open("AUTOGRADE-STDERR-TEMP-FILE.txt", 'w') as fe:
-                        self.process = subprocess.Popen(self.cmd, stdin=subprocess.PIPE, stdout=fo, stderr=fe, preexec_fn=self.setProcessLimits)
+                stdoutFile = tempfile.mkstemp("ag-stdout-")
+                stderrFile = tempfile.mkstemp("ag-stderr-")
+                self.process = subprocess.Popen(self.cmd, stdin=subprocess.PIPE, stdout=stdoutFile[0], stderr=stderrFile[0], preexec_fn=self.setProcessLimits)
                 if stdindata:
                     autogradeobj.log_addEntry("Process manager: Data sent to stdin: "+str(stdindata))
                     self.process.stdin.write(str(stdindata))
                 self.process.stdin.close()
                 self.process.wait()
 
-                self.stdoutdata = autogradeobj.get_abbrv_string_from_file("AUTOGRADE-STDOUT-TEMP-FILE.txt")
-                os.unlink("AUTOGRADE-STDOUT-TEMP-FILE.txt")
-                self.stderrdata = autogradeobj.get_abbrv_string_from_file("AUTOGRADE-STDERR-TEMP-FILE.txt")
-                os.unlink("AUTOGRADE-STDERR-TEMP-FILE.txt")
+                self.stdoutdata = autogradeobj.get_abbrv_string_from_file(stdoutFile[1])
+                os.unlink(stdoutFile[1])
+                self.stderrdata = autogradeobj.get_abbrv_string_from_file(stderrFile[1])
+                os.unlink(stderrFile[1])
 
                 self.retcode = self.process.returncode
                 self.didRun = True
@@ -149,14 +150,14 @@ class Command(object):
 
 class autograder():
     def __init__(self, logFile, username, totalPoints=100):
-        self.logPointsTotal = 100
+        self.logPointsTotal = totalPoints
 
         # Location of the AUTOGRADE.txt file. This file is neither in
         # the working directory nor in the actual submission
         # directory. It will be moved to the student submission
         # directory when the autograder is complete (i.e., cleanup()
         # is called).
-        self.logFile = os.path.join("/tmp", logFile)
+        self.logFile = tempfile.mkstemp(prefix="ag-"+username+"-report-")[1]
         
         # Absolute path that we need to chdir back to when finished
         self.origwd = os.getcwd() 
@@ -165,14 +166,17 @@ class autograder():
         # submission.
         self.directory = os.path.join(self.origwd, username)
 
+        # The name that the final log file should have. Typically:
+        # /something/username/AUTOGRADE.txt
+        self.logFileFinal = os.path.join(self.directory, logFile)
+
         # The autograder will do its work in a working directory
-        self.workingDirectory = "/tmp/autograde-working-" + username
+        self.workingDirectory = tempfile.mkdtemp(prefix="ag-"+username+"-working-")
 
         # Copy the student's submission into the working
         # directory. The only thing that needs to be copied back to
         # the original submission is the AUTOGRADE.txt file.
-        if os.path.exists(self.workingDirectory):
-            shutil.rmtree(self.workingDirectory)
+        shutil.rmtree(self.workingDirectory) # destination can't exist if we use copytree()
         shutil.copytree(self.directory, self.workingDirectory)
 
         # Change into working directory
@@ -188,16 +192,18 @@ class autograder():
             print(bcolors.BOLD + msg + bcolors.ENDC)
             myfile.close()
 
+        self.log_addEntry("Autograder created this report at: %s" % str(datetime.datetime.now().ctime()))
+
+            
         # Add some basic information to AUTOGRADE.txt so that students
         # can figure out exactly which submission the autograder
-        # graded.
+        # graded. This data is retrieved from the AUTOGRADE.json
+        # metadata file.
         metadataFile = os.path.join(self.workingDirectory, "AUTOGRADE.json")
         metadata = {}
         if os.path.exists(metadataFile):
             with open(metadataFile, "r") as f:
                 metadata = json.load(f)
-
-        self.log_addEntry("Autograder created this report at: %s" % str(datetime.datetime.now().ctime()))
 
         if 'canvasSubmission' in metadata:
             cs = metadata['canvasSubmission']
@@ -248,11 +254,10 @@ class autograder():
 
         # move autograde file to its final destination (in the
         # original directory, not the working directory)
-        logFileDestination = os.path.join(self.directory, os.path.basename(self.logFile))
-        if os.path.exists(logFileDestination):
-            os.remove(logFileDestination)
-        shutil.move(self.logFile, logFileDestination)
-        print("Wrote: %s" % logFileDestination)
+        if os.path.exists(self.logFileFinal):
+            os.remove(self.logFileFinal)
+        shutil.move(self.logFile, self.logFileFinal)
+        print("Wrote: %s" % self.logFileFinal)
 
         metadataFile = os.path.join(self.directory, "AUTOGRADE.json")
         metadata = {}
@@ -274,9 +279,13 @@ class autograder():
         """Reset working directory to match the submission."""
         if os.path.exists(self.workingDirectory):
             self.log_addEntry("Restoring working directory to its original state (i.e., as the student submitted it.)")
+            # Change into the original directory (and out of the working directory!)
             os.chdir(self.origwd)
+            # Remove the existing working directory
             shutil.rmtree(self.workingDirectory)
+            # Copy the  original submission back into the working directory
             shutil.copytree(self.directory, self.workingDirectory)
+            # Change into the working directory again.
             os.chdir(self.workingDirectory)
 
 

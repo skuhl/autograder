@@ -70,6 +70,12 @@ def regrade(dirs):
         agfile = os.path.join(thisDir, "AUTOGRADE.txt")
         if os.path.exists(agfile):
             os.unlink(agfile)
+    # Whenever a new autograde report is generated, we change the
+    # metadata file to indicate that an email should be sent. Here, we
+    # proactively do this so it is clear that an email message will
+    # need to get sent.
+    emailClearCache(dirs)
+            
 
 def emailClearCache(dirs):
     for thisDir in dirs:
@@ -227,7 +233,7 @@ def emailSend(dirs):
                 emailStudent(senderEmail, thisDir, emailToAddr, content)
 
         metadata['emailSubject'] = emailSubject
-        metadata['emailCtime'] = str(datetime.datetime.now().ctime)
+        metadata['emailCtime'] = str(datetime.datetime.now().ctime())
         metadata['emailSent']=1
         with open(metadataFile, "w") as f:
             json.dump(metadata, f, indent=4)

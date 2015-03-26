@@ -45,7 +45,8 @@ courseName = settings['courseName']
 assignmentName = settings['assignmentName']
 emailSubject  = settings['emailSubject']
 domainName    = settings['domainName']
-emailUser     = settings['emailUser']
+emailFrom     = settings['emailFrom']
+emailFromName = settings['emailFromName']
 emailPassword = settings['emailPassword']
 emailSmtp     = settings['emailSmtp']
 emailSmtpPort = settings['emailSmtpPort']
@@ -151,8 +152,8 @@ def stats(dirs):
     print("Submission count: %d" % len(dirs))
     try:
         import numpy
-        average = str(numpy.average(score_list))
-        median = str(numpy.median(score_list))
+        average = "%.1f" % numpy.average(score_list)
+        median  = "%.1f" % numpy.median(score_list)
     except ImportError:
         average = "?"
         media = "?"
@@ -182,20 +183,46 @@ def emailStudent(senderEmail, studentUsername, subject, text):
         recipients = [ studentUsername ]
     else:
         recipients = [ studentUsername + "@" + domainName ]   # list of recipients
-    
-    body = text  # body of message
-    headers = ["From: " + senderEmail,
-               "Subject: " + subject,
-               "To: " + ', '.join(recipients),
-               "MIME-Version: 1.0",
-               "Content-Type: text/plain"]
-    headers = "\r\n".join(headers)
+
     global emailSession
-    emailSession.sendmail(senderEmail, recipients, headers + "\r\n\r\n" + body)
+
+    # Send the report in the body of the email.
+    # headers = ["From: " + senderEmail,
+    #            "Subject: " + subject,
+    #            "To: " + ', '.join(recipients),
+    #            "MIME-Version: 1.0",
+    #            "Content-Type: text/plain"]
+    # headers = "\r\n".join(headers)
+    # emailSession.sendmail(senderEmail, recipients, headers + "\r\n\r\n" + text)
+
+    # Send the report as an attachment.
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email.mime.text import MIMEText
+    from email import encoders
+    from email.utils import formataddr
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = formataddr( (str(Header(emailFromName, 'utf-8')),
+                               emailFrom) )
+    msg['To'] = ', '.join(recipients)
+    part = MIMEBase("text", "plain")
+    part.set_payload(text)
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', 'attachment; filename="{0}"'.format("AUTOGRADE.txt"))
+    msg.attach(part)
+    
+    part = MIMEText("Your autograder report is attached.")
+    msg.attach(part)
+    emailSession.sendmail(senderEmail, recipients, msg.as_string())
+
 
 def emailSend(dirs):
     # Login to email server
-    senderEmail = emailUser + '@' + domainName
+    if '@' in emailFrom:
+        senderEmail = emailFrom;
+    else:
+        senderEmail = emailFrom + '@' + domainName
     emailLogin(senderEmail, emailPassword)
 
     # send email messages
@@ -213,14 +240,17 @@ def emailSend(dirs):
             print("%-12s SKIPPING - AUTOGRADE.txt is missing." % thisDir)
             continue;
 
+        # Start by assuming directory name is the username
         emailToAddr = thisDir
 
         # If there is metadata file, get the name of the submitter
         if metadata.get("canvasStudent", False):
             emailToAddr = metadata['canvasStudent']['login_id']
 
+        # If this directory seems to be a group...
         group = metadata.get("canvasStudentsInGroup", None)
         if group:
+            # Email every student in the group
             for student in group:
                 print("%-12s Sending message to group member %s" % (thisDir, student['login_id']))
                 with open(agFilename, 'r') as content_file:
@@ -230,7 +260,7 @@ def emailSend(dirs):
             print("%-12s Sending message to %s" % (thisDir, emailToAddr))
             with open(agFilename, 'r') as content_file:
                 content = content_file.read()
-                emailStudent(senderEmail, thisDir, emailToAddr, content)
+                emailStudent(senderEmail, emailToAddr, emailSubject, content)
 
         metadata['emailSubject'] = emailSubject
         metadata['emailCtime'] = str(datetime.datetime.now().ctime())

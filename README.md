@@ -36,8 +36,9 @@ The first line should be the URL for the Canvas API. For Michigan Tech, for exam
     "subdirName":"autograder",                    // subdirectory to place submissions in
     "domainName":"mtu.edu",                       // domain name to use for email messages
     "emailSubject":"HW5: autograde results",      // subject line to use for email messages
-    "emailUser":"user",                           // email username
-    "emailPassword":"password",                   // email password
+    "emailFrom":"user",                           // email address of sender
+    "emailFromName":"Jane Doe",                   // name of sender
+    "emailPassword":"password",                   // email password for sender
     "emailSmtp":"smtp.gmail.com",                 // smtp server
     "emailSmtpPort":"587"                         // smtp port
 }

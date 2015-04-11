@@ -213,8 +213,8 @@ class autograder():
                 self.log_addEntry("Using Canvas submission from: %s" % dt.ctime())
             if 'attempt' in cs:
                 self.log_addEntry("This is attempt %d (if this is the first submission you made for this assignment, this number will be 1)" % cs['attempt'])
-            if 'filename' in cs:
-                self.log_addEntry("The file that you submitted was named: %s" % cs['filename'])
+            if 'attachments' in cs and cs['attachments'][0] and 'filename' in cs['attachments'][0]:
+                self.log_addEntry("The file that you submitted was named: %s" % cs['attachments'][0]['filename'])
         if 'md5sum' in metadata:
             self.log_addEntry("The submitted file had md5sum: " + metadata['md5sum'])
 

@@ -129,7 +129,17 @@ class canvas():
         if courseId == None:
             print("Can't getStudents without a courseId.")
             exit()
-        return self.makeRequest("courses/"+str(courseId)+"/students")
+        students =  self.makeRequest("courses/"+str(courseId)+"/students?"+
+                                     urllib.parse.urlencode({"per_page":"100",
+                                                             "page": "1"}))
+	# Filter out students who are still "pending".
+	# These "pending" students do not have a login_id, which some of this code relies on
+        nonPendingStudents = []
+        for s in students:
+            if 'login_id' in s:
+                nonPendingStudents.append(s)
+
+        return nonPendingStudents
 
     def getAssignments(self, courseId=None):
         """Gets list of assignments in a course."""
@@ -166,6 +176,10 @@ class canvas():
             commonargs+="&student_ids[]=all"
         else:
             commonargs+="&student_ids[]="+str(studentId)
+        commonargs+="&"
+        commonargs+=urllib.parse.urlencode({"per_page":"100",
+                                            "page": "1"})
+
 
         if assignmentId == None:
             return self.makeRequest("courses/"+str(courseId)+"/students/submissions?"+commonargs)
@@ -176,6 +190,9 @@ class canvas():
     def findStudent(self, students, searchString):
         """Returns a student object that matches the students name, username, or ID. The searchString must match one of the fields in the student object exactly!"""
         searchString = str(searchString).lower()
+        #print("Looking for student " + searchString)
+        #self.prettyPrint(students)
+        #exit(1)
         for s in students:
             if s['name'].lower()          == searchString or \
                s['short_name'].lower()    == searchString or \
@@ -183,6 +200,8 @@ class canvas():
                s['login_id'].lower()      == searchString or \
                str(s['id']) == searchString:
                 return s
+
+        # print("Failed to find student: " + searchString)
         return None
 
     def findAssignment(self, assignments, searchString):
@@ -263,6 +282,7 @@ class canvas():
 
         # For each student, get the student submission history.
         for studentSubmit in submissions:
+            # self.prettyPrint(studentSubmit)
             allHistory = []
             if len(studentSubmit['submissions']) > 0:
                 allHistory = studentSubmit['submissions'][0]['submission_history']
@@ -305,6 +325,11 @@ class canvas():
                     else: # Assuming submissions is what canvas.findSubmissionsToGrade() returns
                         studentSubmissionHist = [ submission ]
 
+#            if 'login_id' not in student or 'name' not in student:
+#                print("ERROR processing student: ")
+#                self.prettyPrint(student)
+#                return
+                        
             if len(studentSubmissionHist) == 0:
                 print(fmtStr%("", " none", 0, str(student['login_id']), student['name']))
             for hist in studentSubmissionHist:
@@ -438,7 +463,6 @@ class canvas():
                 student = self.findStudent(students, i['user_id'])
                 if student:
                     self.downloadSubmission(i, student, dir, group_memberships)
-
 
 
     def get_immediate_files(self, dir):
@@ -607,7 +631,8 @@ class canvas():
             for g in assignmentGroups:
                 usersInGroup = self.makeRequest("groups/"+str(g['id'])+"/users")
                 for u in usersInGroup:
-                    group_memberships[u['login_id']] = (g, usersInGroup);
+                    if 'login_id' in u: # Filter out pending students in a group
+                        group_memberships[u['login_id']] = (g, usersInGroup);
 
         # Get the submissions for the assignment
         if userid:

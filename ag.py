@@ -150,13 +150,15 @@ def stats(dirs):
         print("%-12s %3s %14s %5d %5s %5s %5s" % (d, score, timeString, attempt, late, locked, emailed))
 
     print("Submission count: %d" % len(dirs))
+
+    average = "?"
+    media = "?"
     try:
         import numpy
-        average = "%.1f" % numpy.average(score_list)
-        median  = "%.1f" % numpy.median(score_list)
+        if len(score_list) > 0:
+            average = "%.1f" % numpy.average(score_list)
+            median  = "%.1f" % numpy.median(score_list)
     except ImportError:
-        average = "?"
-        media = "?"
         print("Install numpy for full statistics information.")
         
     if len(score_list) > 0:
@@ -203,8 +205,7 @@ def emailStudent(senderEmail, studentUsername, subject, text):
     from email.utils import formataddr
     msg = MIMEMultipart()
     msg['Subject'] = subject
-    msg['From'] = formataddr( (str(Header(emailFromName, 'utf-8')),
-                               emailFrom) )
+    msg['From'] = formataddr( (emailFromName, emailFrom) )
     msg['To'] = ', '.join(recipients)
     part = MIMEBase("text", "plain")
     part.set_payload(text)

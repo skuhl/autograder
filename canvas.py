@@ -438,7 +438,13 @@ class canvas():
         # Download the file
         print("%-12s downloading attempt %d submitted %s" % (login, newAttempt, 
               self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))))
-        urllib.request.urlretrieve(attachment['url'], directory+"/"+login+exten)
+        try:
+            urllib.request.urlretrieve(attachment['url'], directory+"/"+login+exten)
+        except:
+            print("ERROR: Failed to download "+attachment['url'])
+            import traceback
+            traceback.print_exc()
+            pass
 
         # Write the new metadata out to a file
         metadataNew['locked']=0

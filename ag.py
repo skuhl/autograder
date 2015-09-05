@@ -107,7 +107,7 @@ def removeELFs():
 
 def stats(dirs):
     score_list=[]
-    print("%-12s %s %14s %5s %5s %5s %5s" % ("name", "pts", "SubmitTime", "atmpt", "late", "lock", "email"))
+    print("%-12s %5s %9s %14s %5s %5s %5s %5s" % ("name", "agPts", "canvasPts", "SubmitTime", "atmpt", "late", "lock", "email"))
     for d in dirs:
         metadataFile = d + "/AUTOGRADE.json"
         metadata = {}
@@ -120,14 +120,21 @@ def stats(dirs):
         else:
             emailed=""
 
-        score="---"
+        score="  ---"
         if os.path.exists(os.path.join(d, "AUTOGRADE.txt")):
             with open(os.path.join(d, "AUTOGRADE.txt"), 'r') as f:
                 match = re.search("TOTAL.*: (.*)", f.read())
                 if match.group(1):
                     score_int = int(match.group(1).strip())
                     score_list.append(score_int)
-                    score = "%3d" % score_int
+                    score = "%5d" % score_int
+
+        canvasScore="     ---"
+        if 'canvasSubmission' in metadata:
+            if metadata['canvasSubmission']['workflow_state'] == "graded":
+                canvasScore_int = int(metadata['canvasSubmission'].get('score', "0"))
+                canvasScore = "%9d" % canvasScore_int
+
 
         attempt=0
         timeString=''
@@ -147,7 +154,7 @@ def stats(dirs):
                 utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
                 timeString = canvas.canvas.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))
 
-        print("%-12s %3s %14s %5d %5s %5s %5s" % (d, score, timeString, attempt, late, locked, emailed))
+        print("%-12s %5s %9s %14s %5d %5s %5s %5s" % (d, score, canvasScore, timeString, attempt, late, locked, emailed))
 
     print("Submission count: %d" % len(dirs))
 

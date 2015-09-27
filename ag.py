@@ -219,8 +219,9 @@ def emailStudent(senderEmail, studentUsername, subject, text):
     encoders.encode_base64(part)
     part.add_header('Content-Disposition', 'attachment; filename="{0}"'.format("AUTOGRADE.txt"))
     msg.attach(part)
-    
+
     part = MIMEText("Your autograder report is attached.")
+#    part = MIMEText("Your final autograder report is attached. If your assignment is not graded on Canvas yet, you can leave a comment on your submission (you will need to go to a page which allows you to view your previous submissions to find the place to leave a comment!). The instructor will see your comment when they are giving you your grade. If you have received a grade on Canvas and still have questions or concerns, email me!")
     msg.attach(part)
     emailSession.sendmail(senderEmail, recipients, msg.as_string())
 

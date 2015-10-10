@@ -484,6 +484,67 @@ class canvas():
             if not f.endswith(".AUTOGRADE.json"):
                 self.extractFile(dir+"/"+f, dir, newSubdir)
 
+    def removeELFs(self, subdirName):
+        """Remove ELF files anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:            # for each file in tree
+                fullpath = os.path.join(dirpath, f)
+                if os.path.isfile(fullpath):   # check that it is a file
+                    with open(fullpath, "rb") as fileBytes:  # open the file
+                        magic = fileBytes.read(4)     # read 4 bytes
+                        # print("".join("%02x" % b for b in magic))
+                        # check that the 4 bytes match first 4 bytes of an ELF executable
+                        if len(magic) >= 4 and magic[0] == 0x7f and magic[1] == 0x45 and magic[2]==0x4c and magic[3]==0x46:
+                                print(fullpath + " is ELF executable, removing")
+                                os.unlink(fullpath)
+
+    def removeDSStore(self, subdirName):
+        """Remove unnecessary Apple-related files anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:
+                fullpath = os.path.join(dirpath, f)
+                if os.path.isfile(fullpath):
+                    # https://en.wikipedia.org/wiki/.DS_Store
+                    # https://apple.stackexchange.com/questions/14980/
+                    if f == ".DS_Store" or f.startswith("._"):
+                        print(fullpath + " is unnecessary Apple-related file, removing")
+                        os.unlink(fullpath)
+
+    def removeBackupFiles(self, subdirName):
+        """Remove unnecessary text-editor backup files anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:
+                fullpath = os.path.join(dirpath, f)
+                if os.path.isfile(fullpath):
+                    if (f.startswith("#") and f.endswith("#")) or \
+                       f.endswith("~"):
+                        print(fullpath + " is a text-editor backup file, removing")
+                        os.unlink(fullpath)
+
+    def removeGit(self, subdirName):
+        """Remove unnecessary git repos found anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for d in dnames:
+                fullpath = os.path.join(dirpath, d)
+                if os.path.isdir(fullpath):
+                    if d == ".git":
+                        print(fullpath + " is a git repo, removing")
+                        shutil.rmtree(fullpath)
+
+
+    def removeEndings(self, subdirName, extens):
+        """Given a list of filename extensions, delete all of the files anywhere in the subdirectory.."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:
+                fullpath = os.path.join(dirpath, f)
+                if os.path.isfile(fullpath):
+                    for e in extens:
+                        if f.endswith(e):
+                            print(fullpath + " is a "+e+" file, removing")
+                            os.unlink(fullpath)
+
+
+                
     def extractFile(self, filename, dir, newSubdir=False):
         """Extracts filename into dir. If newSubdir is set, create an additional subdirectory inside of dir to extract the files into."""
         import tarfile,zipfile
@@ -510,7 +571,7 @@ class canvas():
         try:
             # tarfile.is_tarfile() and zipfile.is_zipfile() functions
             # are available, but sometimes it misidentifies files (for
-            # example .docx files are zip files.
+            # example .docx files are zip files).
             if filename.endswith(".tar") or \
                filename.endswith(".tar.gz") or  \
                filename.endswith(".tgz") or \
@@ -554,6 +615,13 @@ class canvas():
             with open(metadataFile, "w") as f:
                 json.dump(metadata, f, indent=4)
         else: # If we did extract files into a subdirectory
+            # Remove files we don't need or want.
+            self.removeELFs(destDir)
+            self.removeDSStore(destDir)
+            self.removeBackupFiles(destDir)
+            self.removeGit(destDir)
+            self.removeEndings(destDir, [".zip", ".tgz", ".tar", ".tar.gz"])
+            
             # Remove unnecessary subdirectories
             onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
             onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]

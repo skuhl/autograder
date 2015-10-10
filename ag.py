@@ -88,23 +88,9 @@ def emailClearCache(dirs):
         metadata['emailSent']=0
         with open(metadataFile, "w") as f:
             json.dump(metadata, f, indent=4)
-    
 
 
-def removeELFs():
-    # Look for ELF executables the user might have submitted and remove them!
-    for dirpath, dnames, fnames in os.walk(subdirName):
-        for f in fnames:            # for each file in tree
-            f = os.path.join(dirpath, f)
-            if os.path.isfile(f):   # check that it is a file
-                with open(f, "rb") as fileBytes:  # open the file
-                    magic = fileBytes.read(4)     # read 4 bytes
-                    # print("".join("%02x" % b for b in magic))
-                    # check that the 4 bytes match first 4 bytes of an ELF executable
-                    if len(magic) >= 4 and magic[0] == 0x7f and magic[1] == 0x45 and magic[2]==0x4c and magic[3]==0x46:
-                            print(f + " is ELF executable, removing")
-                            os.unlink(f)
-
+                            
 def stats(dirs):
     score_list=[]
     print("%-12s %5s %9s %14s %5s %5s %5s %5s" % ("name", "agPts", "canvasPts", "SubmitTime", "atmpt", "late", "lock", "email"))
@@ -336,7 +322,6 @@ elif sys.argv[1] == 'download':
         print(" ag.py download   --> downloads all non-late submissions")
         print(" ag.py download username attempt# --> downloads one specific submission (even if it is late)")
         exit(1)
-    removeELFs()
     
 elif sys.argv[1] == 'email':
     os.chdir(subdirName)

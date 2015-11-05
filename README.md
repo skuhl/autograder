@@ -7,7 +7,7 @@ In short, the normal workflow is:
 
 * *ag.py download*  will download the newest non-late student submissions from Canvas. If the submission. If the submitted file is a tar, tgz, tar.gz, or zip file, the file will be extracted into a subfolder.
 
-* *ag-grade.py* is provided by the instructor and will grade each of the assignments. In the case of programming assignments, this script can compile, run, and examine the output of a computer program. It creates an AUTOGRADE.txt file which contains a report of the automatic grading process. The instructor would use this file to assist with grading and/or share the file with the submitter.
+* *ag-grade.py* is provided by the instructor and will grade each of the assignments. This script would typically make use of the autograde.py module. In the case of programming assignments, this script can compile, run, and examine the output of a computer program. It creates an AUTOGRADE.txt file which contains a report of the automatic grading process. The instructor would use this file to assist with grading and/or share the file with the submitter.
 
 * *ag.py stats* will display general information about the submissions and the scores.
 
@@ -83,11 +83,11 @@ If the Canvas login does not include an '@' symbol, then the domain name specifi
 
 
 
-Useful files include:
+Other files
 ==========
 
-*canvas.py* implements a python module to interface with Canvas using the Instructure Canvas API. Besides being a module used by ag-download.py, it can also be run directly from the command-line. It allows an instructor to see their Canvas courses, list students in a course, list assignments in a course, list assignments that have been submitted, and download submissions.
+*canvas.py* implements a python module to interface with Canvas using the Instructure Canvas API. Besides being a module used by ag.py, it can also be run directly from the command-line. It allows an instructor to see their Canvas courses, list students in a course, list assignments in a course, list assignments that have been submitted, and download submissions.
 
-*autograde.py* implements a python module that provides useful tools for automatic grading.
+*autograde.py* implements a python module used by the ag-grade.py script.
 
 

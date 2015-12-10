@@ -497,6 +497,12 @@ class canvas():
                         if len(magic) >= 4 and magic[0] == 0x7f and magic[1] == 0x45 and magic[2]==0x4c and magic[3]==0x46:
                                 print(fullpath + " is ELF executable, removing")
                                 os.unlink(fullpath)
+                        if len(magic) >= 4 and magic[0] == 0xcf and magic[1] == 0xfa and magic[2]==0xed and magic[3]==0xfe:
+                                print(fullpath + " is Mach-O executable, removing")
+                                os.unlink(fullpath)
+                        if len(magic) >= 4 and magic[0] == 0xce and magic[1] == 0xfa and magic[2]==0xed and magic[3]==0xfe:
+                                print(fullpath + " is Mach-O executable, removing")
+                                os.unlink(fullpath)
 
     def removeDSStore(self, subdirName):
         """Remove unnecessary Apple-related files anywhere in the subdirectory."""

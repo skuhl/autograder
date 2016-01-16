@@ -61,7 +61,7 @@ class canvas():
             request = urllib.request.Request(urlString)
             request.add_header("Authorization", "Bearer " + self.CANVAS_TOKEN);
             response = urllib.request.urlopen(request)
-            json_string = response.readall().decode('utf-8');
+            json_string = response.read().decode('utf-8');
             retVal = json.loads(json_string)
 
             # Deal with pagination:

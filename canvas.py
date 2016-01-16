@@ -503,6 +503,7 @@ class canvas():
                         if len(magic) >= 4 and magic[0] == 0xce and magic[1] == 0xfa and magic[2]==0xed and magic[3]==0xfe:
                                 print(fullpath + " is Mach-O executable, removing")
                                 os.unlink(fullpath)
+                                
 
     def removeDSStore(self, subdirName):
         """Remove unnecessary Apple-related files anywhere in the subdirectory."""
@@ -537,6 +538,15 @@ class canvas():
                         print(fullpath + " is a git repo, removing")
                         shutil.rmtree(fullpath)
 
+    def removeAutograder(self, subdirName, extens):
+        """Removes any AUTOGRADE* files that the student might maliciously submit."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:
+                fullpath = os.path.join(dirpath, f)
+                if os.path.isfile(fullpath):
+                    if f.startswith("AUTOGRADE"):
+                        print(fullpath + " is an autograder file; clever students might try to maliciously submit these to mess with the autograder")
+                        os.unlink(fullpath)
 
     def removeEndings(self, subdirName, extens):
         """Given a list of filename extensions, delete all of the files anywhere in the subdirectory.."""
@@ -626,7 +636,8 @@ class canvas():
             self.removeDSStore(destDir)
             self.removeBackupFiles(destDir)
             self.removeGit(destDir)
-            self.removeEndings(destDir, [".zip", ".tgz", ".tar", ".tar.gz"])
+            self.removeAutograder(destDir)
+            self.removeEndings(destDir, [".zip", ".tgz", ".tar", ".tar.gz", ".a"])
             
             # Remove unnecessary subdirectories
             onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]

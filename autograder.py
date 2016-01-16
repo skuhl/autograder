@@ -116,8 +116,8 @@ class Command(object):
         try:
             thread = threading.Thread(target=target)
             thread.start()
-            time.sleep(.5)
             if workToDoWhileRunning:
+                time.sleep(.5)  # give time for process to start.
                 workToDoWhileRunning()
             thread.join(timeout)
 

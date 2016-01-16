@@ -532,9 +532,9 @@ class autograder():
                                shell=True, stdout=subprocess.PIPE)
         (stdoutdata, stderrdata)  = cmd.communicate()
         if len(stdoutdata) < 10:
-            self.log_addEntry(exe + " does not contain debugging information.", deductNoDebug)
+            self.log_addEntry("'" + exe + "' does not contain debugging information.", deductNoDebug)
         else:
-	        self.log_addEntry(exe + " contains debugging information.", 0)
+	        self.log_addEntry("'" + exe + "' contains debugging information.", 0)
 
     def expect_md5(self, filename, expectMd5, deductMissingFile=0, deductWrongMd5=0):
         if not os.path.exists(filename):

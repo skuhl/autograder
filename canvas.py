@@ -538,7 +538,7 @@ class canvas():
                         print(fullpath + " is a git repo, removing")
                         shutil.rmtree(fullpath)
 
-    def removeAutograder(self, subdirName, extens):
+    def removeAutograder(self, subdirName):
         """Removes any AUTOGRADE* files that the student might maliciously submit."""
         for dirpath, dnames, fnames in os.walk(subdirName):
             for f in fnames:

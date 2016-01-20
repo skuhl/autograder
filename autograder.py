@@ -115,11 +115,14 @@ class Command(object):
 
         try:
             thread = threading.Thread(target=target)
-            thread.start()
             if workToDoWhileRunning:
+                thread.start()
                 time.sleep(.5)  # give time for process to start.
                 workToDoWhileRunning()
-            thread.join(timeout)
+                thread.join(timeout)
+            else:
+                # Just run the thread directly, wait for it to finish.
+                thread.run()
 
         # Without this, Ctrl+C will cause python to exit---but we will
         # be forced to wait until the process we are running times out
@@ -244,9 +247,13 @@ class autograder():
         os.chdir(self.origwd)
         shutil.rmtree(self.workingDirectory)
         # Appends the student's total score to the log file.
-        msg = "TOTAL (instructor/TA/grader may adjust it!): " + str(self.logPointsTotal) + "\n"
+        msg = "TOTAL: " + str(self.logPointsTotal) + "\n"
+        
         if self.logPointsTotal < 0:
             msg = msg + "Ouch! That score is less than 0! This can happen because the autograder starts by giving everybody 100 points and then deducts points for any problem it sees (this approach is not perfect). We won't give you a score less than 0. If there is a simple change that makes your program work correctly, the instructor/TA/grader might give you a much, much higher score.\n"
+
+        msg += "IMPORTANT: If this report is sent prior to the assignment deadline, remember that the autograder tests and scoring may change significantly. If this report is sent after the assignment deadline, remember that the instructor or TA will use this report to assist with grading---and your actual grade may differ from what this report says. If you have any information that the instructor or TA should know about when grading your submission, please leave a comment on your submission in Canvas."
+            
         with open(self.logFile, "a") as myfile:
             myfile.write(msg)
             myfile.close()

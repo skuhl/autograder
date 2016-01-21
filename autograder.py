@@ -115,14 +115,13 @@ class Command(object):
 
         try:
             thread = threading.Thread(target=target)
+            thread.start()
+
             if workToDoWhileRunning:
-                thread.start()
                 time.sleep(.5)  # give time for process to start.
                 workToDoWhileRunning()
-                thread.join(timeout)
-            else:
-                # Just run the thread directly, wait for it to finish.
-                thread.run()
+                
+            thread.join(timeout)
 
         # Without this, Ctrl+C will cause python to exit---but we will
         # be forced to wait until the process we are running times out
@@ -215,7 +214,7 @@ class autograder():
                 dt = utc_dt.replace(tzinfo=datetime.timezone.utc).astimezone(tz=None)
                 self.log_addEntry("Using Canvas submission from: %s" % dt.ctime())
             if 'attempt' in cs:
-                self.log_addEntry("This is attempt %d (if this is the first submission you made for this assignment, this number will be 1)" % cs['attempt'])
+                self.log_addEntry("This is attempt #%d (your first canvas submission will be #1)" % cs['attempt'])
             if 'attachments' in cs and cs['attachments'][0] and 'filename' in cs['attachments'][0]:
                 self.log_addEntry("The file that you submitted was named: %s" % cs['attachments'][0]['filename'])
         if 'md5sum' in metadata:
@@ -230,6 +229,8 @@ class autograder():
                'short_name' in metadata['canvasStudent']:
                 self.log_addEntry("Your name: " + metadata['canvasStudent']['short_name'])
 
+        self.log_addEntry("You initially have "+str(self.logPointsTotal)+" points; autograder will deduct points below; total at bottom.")
+                
         # Adjust grade based on the contents of AUTOGRADE-MANUAL.txt
         # that the teacher may have added to the directory. This file
         # will contain the number of points to deduct, a space, and

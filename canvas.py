@@ -516,6 +516,11 @@ class canvas():
                     if f == ".DS_Store" or f.startswith("._"):
                         print(fullpath + " is unnecessary Apple-related file, removing")
                         os.unlink(fullpath)
+            for d in dnames:
+                fullpath = os.path.join(dirpath, d)
+                if os.path.isdir(fullpath) and d == "__MACOSX":
+                    print(fullpath + " is a Apple related folder, removing")
+                    shutil.rmtree(fullpath)
 
     def removeBackupFiles(self, subdirName):
         """Remove unnecessary text-editor backup files anywhere in the subdirectory."""

@@ -97,8 +97,10 @@ class Command(object):
                 self.process.wait()
 
                 self.stdoutdata = autogradeobj.get_abbrv_string_from_file(stdoutFile[1])
+                os.close(stdoutFile[0])
                 os.unlink(stdoutFile[1])
                 self.stderrdata = autogradeobj.get_abbrv_string_from_file(stderrFile[1])
+                os.close(stderrFile[0])
                 os.unlink(stderrFile[1])
 
                 self.retcode = self.process.returncode

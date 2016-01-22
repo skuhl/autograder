@@ -96,11 +96,15 @@ class Command(object):
                 self.process.stdin.close()
                 self.process.wait()
 
-                self.stdoutdata = autogradeobj.get_abbrv_string_from_file(stdoutFile[1])
+                # Close the temp files we wrote to, get an
+                # (potentially abbreviated) string from the file,
+                # delete the file.
                 os.close(stdoutFile[0])
+                self.stdoutdata = autogradeobj.get_abbrv_string_from_file(stdoutFile[1])
                 os.unlink(stdoutFile[1])
-                self.stderrdata = autogradeobj.get_abbrv_string_from_file(stderrFile[1])
+                
                 os.close(stderrFile[0])
+                self.stderrdata = autogradeobj.get_abbrv_string_from_file(stderrFile[1])
                 os.unlink(stderrFile[1])
 
                 self.retcode = self.process.returncode

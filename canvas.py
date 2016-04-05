@@ -274,7 +274,7 @@ class canvas():
                 return False
         return True
     
-    def findSubmissionsToGrade(self, submissions, attempt=-1):
+    def findSubmissionsToGrade(self, submissions, attempt=-1, acceptLate=False):
         """Returns newest non-late submissions. If attempt is set, only return the submissions with that attempt number."""
         goodSubmissions = []
 
@@ -294,7 +294,7 @@ class canvas():
                 if not hist['attempt']:
                     continue
                 if attempt <= 0:
-                    if self.isSubmissionNewestNonLate(hist, allHistory):
+                    if acceptLate==True or self.isSubmissionNewestNonLate(hist, allHistory):
                         toGrade = hist
                 else:
                     if attempt == hist['attempt']:
@@ -392,7 +392,11 @@ class canvas():
             metadataNew['canvasStudentsInGroup'] = usersInGroup
             login = group['name']
 
-        # Look for an existing metadata file
+        # Look for an existing metadata file. When we just download
+        # the submitted file (pre-extraction), We will have just the
+        # submitted file and the login name with ".AUTOGRADE.json"
+        # appended to it. After we extract, the submissions may go
+        # into a directory.
         metadataFile = None;
         metadataFiles = [ os.path.join(directory,login+".AUTOGRADE.json"),
                           os.path.join(directory,login,"AUTOGRADE.json") ]
@@ -418,15 +422,29 @@ class canvas():
         else:
             cachedAttempt = metadataCache['canvasSubmission']['attempt']
         newAttempt = metadataNew['canvasSubmission']['attempt']
+        isLate = metadataNew['canvasSubmission']['late']
 
+        # Update our cached information to contain current grade
+        # entered into Canvas. If we are getting a newer submission
+        # than what we already have, then we'll update the metadata
+        # when we get the new submission.
+        if newAttempt == cachedAttempt and os.path.exists(metadataFile):
+            metadataCache['canvasSubmission'] = metadataNew['canvasSubmission']
+            with open(metadataFile, "w") as f:
+                metadata_string = json.dump(metadataCache, f, indent=4)
+        
         # Determine if we should download the submission or not
         if locked:
-            print("%-12s skipping download because submission is locked." % login)
+            print("%-12s skipping download because submission is locked to attempt %d." % (login, cachedAttempt))
             return
-        if newAttempt <= cachedAttempt:
-            print("%-12s is up to date" % login)
+        if newAttempt == cachedAttempt:
+            print("%-12s We already have downloaded attempt %2d. Skipping download." % (login, newAttempt))
+            return
+        if newAttempt < cachedAttempt:
+            print("%-12s WARNING: You requested attempt %2d; directory contains newer attempt %2d; SKIPPING DOWNLOAD. To force a download, erase the student directory and rerun. Or, rerun and request to dowload that students' specific attempt." % (login, newAttempt, cachedAttempt))
             return
 
+        
         archiveFile  = os.path.join(directory,login+exten)
 
         # Delete existing archive if it exists.
@@ -436,8 +454,8 @@ class canvas():
             if os.path.exists(archiveFile):
                 os.unlink(archiveFile)
         # Download the file
-        print("%-12s downloading attempt %d submitted %s" % (login, newAttempt, 
-              self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))))
+        print("%-12s downloading attempt %d submitted %s (replacing attempt %d)" % (login, newAttempt, 
+              self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)), cachedAttempt))
         try:
             urllib.request.urlretrieve(attachment['url'], directory+"/"+login+exten)
         except:
@@ -589,6 +607,11 @@ class canvas():
 
         if os.path.exists(destDir):
             shutil.rmtree(destDir)
+
+        # Ensure destination directory exists. If a student submits an
+        # empty tgz file, for example, the code below won't create the
+        # empty directory.
+        os.mkdir(destDir)
         try:
             # tarfile.is_tarfile() and zipfile.is_zipfile() functions
             # are available, but sometimes it misidentifies files (for
@@ -687,7 +710,7 @@ class canvas():
             print("Warning: You are setting the default courseId to None.")
         self.courseId = courseId;
 
-    def downloadAssignment(self, courseName, assignmentName, subdirName, userid=None, attempt=-1):
+    def downloadAssignment(self, courseName, assignmentName, subdirName, userid=None, attempt=-1, acceptLate=False):
         # Find the course
         courses = self.getCourses()
         courseId = self.findCourseId(courses, courseName)
@@ -739,7 +762,7 @@ class canvas():
         submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId, studentId=studentId)
 
         # Filter out the submissions that we want to grade (newest, non-late submission)
-        submissionsToGrade = self.findSubmissionsToGrade(submissions, attempt)
+        submissionsToGrade = self.findSubmissionsToGrade(submissions, attempt, acceptLate)
 
         # Download the submissions
         self.downloadSubmissions(submissionsToGrade, students, subdirName, group_memberships)

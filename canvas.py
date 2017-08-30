@@ -841,6 +841,20 @@ if __name__ == "__main__":
         elif action == "assignmentDownload":
             canvas.downloadAssignment(args.course, args.assignment, "canvas-submissions")
 
+        # elif action == "testCommenting":
+        #     courseId = canvas.findCourseId(courses, args.course)
+        #     canvas.setDefaultCourseId(courseId)
+
+        #     assignments = canvas.getAssignments()
+        #     students = canvas.getStudents()
+        #     assignmentId = canvas.findAssignmentId(assignments, args.assignment)
+        #     submissions = canvas.getSubmissions(assignmentId=assignmentId)
+
+        #     canvas.commentOnSubmission(courseId=courseId, assignmentId=assignmentId, studentId=3924612, comment="hello world")
+        #     canvas.gradeSubmission(courseId=courseId, assignmentId=assignmentId, studentId=3924612, grade=1)
+
+
+            
         else:
             print("Unknown action: " + action)
             parser.print_help()

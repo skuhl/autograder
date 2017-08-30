@@ -2,7 +2,7 @@
 # Author: Scott Kuhl
 import json, urllib.request, urllib.parse
 import textwrap
-import sys,shutil,os,time,hashlib,re
+import sys,shutil,os,stat,time,hashlib,re
 from pprint import pprint
 import argparse
 
@@ -347,28 +347,58 @@ class canvas():
         import datetime
         diff = now - d
         s = diff.seconds
-        if diff.days > 7 or diff.days < 0:
-            local = d.astimezone(None)
-            return local.strftime('%Y-%m-%d')
-        elif diff.days == 1:
-            return ' 1 day ago'
-        elif diff.days > 1:
-            return '{:2d} days ago'.format(int(diff.days))
-        elif s <= 1:
-            return 'just now'
-        elif s < 60:
-            return '{:2d} seconds ago'.format(int(s))
-        elif s < 120:
-            return ' 1 minute ago'
-        elif s < 3600:
-            return '{:2d} minutes ago'.format(int(s/60))
-        elif s < 7200:
-            return ' 1 hour ago'
+        local = d.astimezone(None)
+        localstring = local.strftime('%Y-%m-%d %I:%M%p')
+
+        if diff.days > 200 or diff.days < -200:
+            humanstring = ""
+        elif d < now:
+            if diff.days == 1:            
+                humanstring = '1 day ago'
+            elif diff.days > 1:
+                humanstring = '{:d} days ago'.format(int(diff.days))
+            elif s <= 1:
+                humanstring = 'just now'
+            elif s < 60:
+                humanstring = '{:d} seconds ago'.format(int(s))
+            elif s < 120:
+                humanstring = '1 minute ago'
+            elif s < 3600:
+                humanstring = '{:d} minutes ago'.format(int(s/60))
+            elif s < 7200:
+                humanstring = '1 hour ago'
+            else:
+                humanstring = '{:d} hours ago'.format(int(s/3600))
         else:
-            return '{:2d} hours ago'.format(int(s/3600))
+            diff = d - now;
+            s = diff.seconds
+            if diff.days == 1:
+                humanstring = '1 day from now'
+            elif diff.days > 1:
+                humanstring = '{:d} days from now'.format(int(diff.days))
+            elif s <= 1:
+                humanstring = 'moments from now'
+            elif s < 60:
+                humanstring = '{:d} seconds from now'.format(int(s))
+            elif s < 120:
+                humanstring = '1 minute from now'
+            elif s < 3600:
+                humanstring = '{:d} minutes from'.format(int(s/60))
+            elif s < 7200:
+                humanstring = '1 hour from now'
+            else:
+                humanstring = '{:d} hours from now'.format(int(s/3600))
+
+        if len(humanstring) == 0:
+            return localstring
+        else:
+            return "%s (%s)" % (localstring, humanstring)
+
 
     def downloadSubmission(self, submission, student, directory, group_memberships={}):
         """Downloads a specific submission from a student into a directory."""
+
+        #self.prettyPrint(submission)
 
         attachment = submission['attachments'][0]
         filename = attachment['filename']
@@ -377,8 +407,16 @@ class canvas():
         utc_dt = datetime.datetime.strptime(submission['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
         utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
 
-        # Create a new metadata record to save
+        # Create a new metadata record to save. 
         metadataNew = {
+            # Put submission time in local time zone since everything
+            # else is in UTC. This isn't used for anything other than
+            # making it easy for someone to look at the file and
+            # understand the submission time. tz=None to convert to
+            # local time zone requires Python 3.3 or higher.
+            "localSubmissionTime":str(utc_dt.astimezone(tz=None)),
+
+            # Include the submission and student information:
             "canvasSubmission":submission,
             "canvasStudent":student }
 
@@ -540,6 +578,17 @@ class canvas():
                     print(fullpath + " is a Apple related folder, removing")
                     shutil.rmtree(fullpath)
 
+    def removeSymLinks(self, subdirName):
+        """Remove symbolic links anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:
+                fullpath = os.path.join(dirpath, f)
+                if os.path.islink(fullpath):
+                        print(fullpath + " is a symlink, removing")
+                        os.unlink(fullpath)
+
+
+                    
     def removeBackupFiles(self, subdirName):
         """Remove unnecessary text-editor backup files anywhere in the subdirectory."""
         for dirpath, dnames, fnames in os.walk(subdirName):
@@ -639,7 +688,7 @@ class canvas():
                 # file submissions from getting put into
                 # subdirectories. Removing this line may break a
                 # variety of different elements of the autograder.
-                os.mkdir(destDir)
+                print("Trying to move "+filename+" to "+destDir)
                 shutil.move(filename, destDir)
                 print(destDir + ": No need to extract " + filename);
         except:
@@ -660,6 +709,7 @@ class canvas():
                 json.dump(metadata, f, indent=4)
         else: # If we did extract files into a subdirectory
             # Remove files we don't need or want.
+            self.removeSymLinks(destDir)
             self.removeELFs(destDir)
             self.removeDSStore(destDir)
             self.removeBackupFiles(destDir)
@@ -668,22 +718,26 @@ class canvas():
             self.removeEndings(destDir, [".zip", ".tgz", ".tar", ".tar.gz", ".a"])
             
             # Remove unnecessary subdirectories
-            onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
-            onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]
-            print(destDir + ": Contains %d file(s) and %d dir(s)"%(len(onlyfiles), len(onlydirs)))
-            # If submission included all files in a subdirectory, remove the subdirectory
-            if len(onlyfiles) == 0 and len(onlydirs) == 1:
-                print(destDir + ": Removing unnecessary subdirectory.")
-                # Delete previous temporary directory if it exists
-                shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
-                # Move subfolder into temporary directory
-                tmpDir = "/tmp/autograder-tmp-dir/"+onlydirs[0]
-                shutil.move(destDir+"/"+onlydirs[0], tmpDir)
-                # Move the files files in the temporary directory into the destination directory
-                for f in os.listdir(tmpDir):
-                    shutil.move(tmpDir+"/"+f, destDir)
-                # Remove temporary directory
-                shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
+            while True:
+                onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
+                onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]
+                print(destDir + ": Contains %d file(s) and %d dir(s)"%(len(onlyfiles), len(onlydirs)))
+                # If submission included all files in a subdirectory, remove the subdirectory
+                if len(onlyfiles) == 0 and len(onlydirs) == 1:
+                    print(destDir + ": Removing unnecessary subdirectory named '"+onlydirs[0]+"'")
+                    # Delete previous temporary directory if it exists
+                    shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
+                    # Move subfolder into temporary directory
+                    tmpDir = "/tmp/autograder-tmp-dir/"+onlydirs[0]
+                    shutil.move(destDir+"/"+onlydirs[0], tmpDir)
+                    # Move the files files in the temporary directory into the destination directory
+                    for f in os.listdir(tmpDir):
+                        #print("moving: "+tmpDir+"/"+f+" to "+destDir)
+                        shutil.move(tmpDir+"/"+f, destDir)
+                    # Remove temporary directory
+                    shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
+                else:
+                    break; # done removing nested single directories
 
             # Remove original metadata file, write one out in the
             # subdirectory.
@@ -692,6 +746,12 @@ class canvas():
             with open(metadataFileDestDir, "w") as f:
                 json.dump(metadata, f, indent=4)
 
+            # Don't allow others to read/write/execute files or directories
+            for dirpath, dnames, fnames in os.walk(destDir):
+                for path in dnames+fnames:
+                    path = os.path.join(dirpath, path)
+                    currentPerm = os.stat(path).st_mode
+                    os.chmod(path, currentPerm & ~(stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH))
 
     def printCourseIds(self, courses):
         for i in courses:
@@ -702,6 +762,9 @@ class canvas():
             print("%10s %s"%(str(i['id']), i['name']))
   
     def printStudentIds(self, students):
+        # It would be nice if we could print out the name of the
+        # section that the student is in, but it isn't easily
+        # available here.
         for i in students:
             print("%10s %10s %s"%(str(i['id']), i['login_id'], i['name']))
 

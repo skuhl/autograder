@@ -291,8 +291,12 @@ def emailSend(dirs):
     message = "Your autograder report is attached. "
     allScores = getAllScores()
     totalAttempts = getSumOfAttempts()
+    if len(allScores) == 1:
+        message += "Congratulations. You are the first and only student to have submitted something. "
+    elif len(allScores) > 1:
+        message += "%d students have made %d submissions for this assignment (an average of about %d submissions per student). " % (len(allScores), totalAttempts, int(round(totalAttempts/len(allScores))))
+
     if len(allScores) > 5:
-        message += "%d students have made a total of %d submissions (an average of about %d attempts per student). " % (len(allScores), totalAttempts, int(round(totalAttempts/len(allScores))))
         message += "The average score is %d. " % int(round(statistics.mean(allScores)))
         message += "The median score is %d. " % int(round(statistics.median(allScores)))
         try:
@@ -394,6 +398,8 @@ elif sys.argv[1] == 'download':
     c = canvas.canvas()
     if len(sys.argv) == 2:
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName)
+    elif len(sys.argv) == 3:
+        c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, userid=sys.argv[2])
     elif len(sys.argv) == 4:
         # Delete the any existing submission with the given name
         if os.path.exists(os.path.join(subdirName, sys.argv[2])):
@@ -409,9 +415,15 @@ elif sys.argv[1] == 'downloadlate':
     c = canvas.canvas()
     if len(sys.argv) == 2:
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, acceptLate=True)
+    if len(sys.argv) == 3:
+        # Delete the any existing submission with the given name
+        if os.path.exists(os.path.join(subdirName, sys.argv[2])):
+            shutil.rmtree(os.path.join(subdirName, sys.argv[2]))
+        c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, userid=sys.argv[2], acceptLate=True)
     else:
         print("Usage:")
         print(" ag.py downloadlate   --> downloads all submissions (including late ones)")
+        print(" ag.py downloadlate username  --> download newest submission from user (including late ones)")
         print(" Use the 'download' command to download a specific submission")
         exit(1)
         

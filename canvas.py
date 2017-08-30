@@ -32,14 +32,15 @@ class canvas():
     CANVAS_TOKEN = None
     courseId = 0;
 
-    def __init__(self, token=None, courseId=None):
+    def __init__(self, token=None, api=None, courseId=None):
         canvasTokenFile = os.path.expanduser("~/.canvas-token")
-        if token:
+        if token and api:
             self.CANVAS_TOKEN = str(token)
+            self.CANVAS_API = str(api)
         else:
             with open(canvasTokenFile) as f:
                 exec(f.read())
-
+                
         if not self.CANVAS_TOKEN:
             print("Canvas token not found.")
             exit()
@@ -57,7 +58,7 @@ class canvas():
             else:
                 urlString = url
         
-            print("Requesting: " +urlString)
+            #print("Requesting: " +urlString)
             request = urllib.request.Request(urlString)
             request.add_header("Authorization", "Bearer " + self.CANVAS_TOKEN);
             response = urllib.request.urlopen(request)
@@ -151,10 +152,10 @@ class canvas():
 
     def commentOnSubmission(self, courseId, assignmentId, studentId, comment):
         courseId = courseId or self.courseId
-        if courseId == None:
+        if type(courseId) != int:
             print("Can't get comment on submissions without a courseId.")
             exit(1)
-        if assignmentId == None or studentId == None:
+        if type(assignmentId) != int or type(studentId) != int:
             printf("Can't comment on a submission without a assignment ID and a student ID.")
             exit(1)
 

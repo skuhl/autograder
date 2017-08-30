@@ -165,6 +165,22 @@ class canvas():
                      "/submissions/"+str(studentId)+"?"+
                      urllib.parse.urlencode({"comment[text_comment]" : comment}))
 
+    def gradeSubmission(self, courseId, assignmentId, studentId, grade):
+        courseId = courseId or self.courseId
+        if type(courseId) != int:
+            print("Can't get comment on submissions without a courseId.")
+            exit(1)
+        if type(assignmentId) != int or type(studentId) != int:
+            printf("Can't comment on a submission without a assignment ID and a student ID.")
+            exit(1)
+
+        
+        self.makePut("courses/"+str(courseId)+
+                     "/assignments/"+str(assignmentId)+
+                     "/submissions/"+str(studentId)+"?"+
+                     urllib.parse.urlencode({"submission[posted_grade]" : grade}))
+
+        
     
     def getSubmissions(self, courseId=None, assignmentId=None, studentId=None):
         """Gets all submissions for a course, all submissions for a student in a course, or all submissions for a specific assignment+student combination."""
@@ -187,7 +203,21 @@ class canvas():
         else:
             return self.makeRequest("courses/"+str(courseId)+"/students/submissions?assignment_ids[]="+str(assignmentId)+"&"+commonargs)
 
-    
+    def gradeableStudents(self, courseId=None, assignmentId=None):
+        """Lists all gradeable students for this assignment. Since some assignments are only available to some students, we may not be able to grade."""
+        courseId = courseId or self.courseId
+        if courseId == None:
+            print("Can't find courseId to retrieve list of gradeable students.")
+            exit()
+        print(str(assignmentId))
+        if type(assignmentId) != int:
+            print("assignmentId must be specified to retrieve list of gradeable students")
+            exit()
+
+
+        return self.makeRequest("courses/"+str(courseId)+"/assignments/"+str(assignmentId)+"/gradeable_students")
+
+        
     def findStudent(self, students, searchString):
         """Returns a student object that matches the students name, username, or ID. The searchString must match one of the fields in the student object exactly!"""
         searchString = str(searchString).lower()
@@ -806,6 +836,7 @@ if __name__ == "__main__":
     #        submissionsToGrade = canvas.findSubmissionsToGrade(submissions)
     #        canvas.printSubmissionSummary(submissionsToGrade, students)
 
+            canvas.prettyPrint(canvas.gradeableStudents(assignmentId=assignmentId))
 
         elif action == "assignmentDownload":
             canvas.downloadAssignment(args.course, args.assignment, "canvas-submissions")

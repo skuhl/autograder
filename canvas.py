@@ -2,7 +2,7 @@
 # Author: Scott Kuhl
 import json, urllib.request, urllib.parse
 import textwrap
-import sys,shutil,os,time,hashlib,re
+import sys,shutil,os,stat,time,hashlib,re
 from pprint import pprint
 import argparse
 
@@ -305,7 +305,7 @@ class canvas():
                 return False
         return True
     
-    def findSubmissionsToGrade(self, submissions, attempt=-1):
+    def findSubmissionsToGrade(self, submissions, attempt=-1, acceptLate=False):
         """Returns newest non-late submissions. If attempt is set, only return the submissions with that attempt number."""
         goodSubmissions = []
 
@@ -325,7 +325,7 @@ class canvas():
                 if not hist['attempt']:
                     continue
                 if attempt <= 0:
-                    if self.isSubmissionNewestNonLate(hist, allHistory):
+                    if acceptLate==True or self.isSubmissionNewestNonLate(hist, allHistory):
                         toGrade = hist
                 else:
                     if attempt == hist['attempt']:
@@ -378,28 +378,58 @@ class canvas():
         import datetime
         diff = now - d
         s = diff.seconds
-        if diff.days > 7 or diff.days < 0:
-            local = d.astimezone(None)
-            return local.strftime('%Y-%m-%d')
-        elif diff.days == 1:
-            return ' 1 day ago'
-        elif diff.days > 1:
-            return '{:2d} days ago'.format(int(diff.days))
-        elif s <= 1:
-            return 'just now'
-        elif s < 60:
-            return '{:2d} seconds ago'.format(int(s))
-        elif s < 120:
-            return ' 1 minute ago'
-        elif s < 3600:
-            return '{:2d} minutes ago'.format(int(s/60))
-        elif s < 7200:
-            return ' 1 hour ago'
+        local = d.astimezone(None)
+        localstring = local.strftime('%Y-%m-%d %I:%M%p')
+
+        if diff.days > 200 or diff.days < -200:
+            humanstring = ""
+        elif d < now:
+            if diff.days == 1:            
+                humanstring = '1 day ago'
+            elif diff.days > 1:
+                humanstring = '{:d} days ago'.format(int(diff.days))
+            elif s <= 1:
+                humanstring = 'just now'
+            elif s < 60:
+                humanstring = '{:d} seconds ago'.format(int(s))
+            elif s < 120:
+                humanstring = '1 minute ago'
+            elif s < 3600:
+                humanstring = '{:d} minutes ago'.format(int(s/60))
+            elif s < 7200:
+                humanstring = '1 hour ago'
+            else:
+                humanstring = '{:d} hours ago'.format(int(s/3600))
         else:
-            return '{:2d} hours ago'.format(int(s/3600))
+            diff = d - now;
+            s = diff.seconds
+            if diff.days == 1:
+                humanstring = '1 day from now'
+            elif diff.days > 1:
+                humanstring = '{:d} days from now'.format(int(diff.days))
+            elif s <= 1:
+                humanstring = 'moments from now'
+            elif s < 60:
+                humanstring = '{:d} seconds from now'.format(int(s))
+            elif s < 120:
+                humanstring = '1 minute from now'
+            elif s < 3600:
+                humanstring = '{:d} minutes from'.format(int(s/60))
+            elif s < 7200:
+                humanstring = '1 hour from now'
+            else:
+                humanstring = '{:d} hours from now'.format(int(s/3600))
+
+        if len(humanstring) == 0:
+            return localstring
+        else:
+            return "%s (%s)" % (localstring, humanstring)
+
 
     def downloadSubmission(self, submission, student, directory, group_memberships={}):
         """Downloads a specific submission from a student into a directory."""
+
+        #self.prettyPrint(submission)
 
         attachment = submission['attachments'][0]
         filename = attachment['filename']
@@ -408,8 +438,16 @@ class canvas():
         utc_dt = datetime.datetime.strptime(submission['submitted_at'], '%Y-%m-%dT%H:%M:%SZ')
         utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
 
-        # Create a new metadata record to save
+        # Create a new metadata record to save. 
         metadataNew = {
+            # Put submission time in local time zone since everything
+            # else is in UTC. This isn't used for anything other than
+            # making it easy for someone to look at the file and
+            # understand the submission time. tz=None to convert to
+            # local time zone requires Python 3.3 or higher.
+            "localSubmissionTime":str(utc_dt.astimezone(tz=None)),
+
+            # Include the submission and student information:
             "canvasSubmission":submission,
             "canvasStudent":student }
 
@@ -423,7 +461,11 @@ class canvas():
             metadataNew['canvasStudentsInGroup'] = usersInGroup
             login = group['name']
 
-        # Look for an existing metadata file
+        # Look for an existing metadata file. When we just download
+        # the submitted file (pre-extraction), We will have just the
+        # submitted file and the login name with ".AUTOGRADE.json"
+        # appended to it. After we extract, the submissions may go
+        # into a directory.
         metadataFile = None;
         metadataFiles = [ os.path.join(directory,login+".AUTOGRADE.json"),
                           os.path.join(directory,login,"AUTOGRADE.json") ]
@@ -449,15 +491,29 @@ class canvas():
         else:
             cachedAttempt = metadataCache['canvasSubmission']['attempt']
         newAttempt = metadataNew['canvasSubmission']['attempt']
+        isLate = metadataNew['canvasSubmission']['late']
 
+        # Update our cached information to contain current grade
+        # entered into Canvas. If we are getting a newer submission
+        # than what we already have, then we'll update the metadata
+        # when we get the new submission.
+        if newAttempt == cachedAttempt and os.path.exists(metadataFile):
+            metadataCache['canvasSubmission'] = metadataNew['canvasSubmission']
+            with open(metadataFile, "w") as f:
+                metadata_string = json.dump(metadataCache, f, indent=4)
+        
         # Determine if we should download the submission or not
         if locked:
-            print("%-12s skipping download because submission is locked." % login)
+            print("%-12s skipping download because submission is locked to attempt %d." % (login, cachedAttempt))
             return
-        if newAttempt <= cachedAttempt:
-            print("%-12s is up to date" % login)
+        if newAttempt == cachedAttempt:
+            print("%-12s We already have downloaded attempt %2d. Skipping download." % (login, newAttempt))
+            return
+        if newAttempt < cachedAttempt:
+            print("%-12s WARNING: You requested attempt %2d; directory contains newer attempt %2d; SKIPPING DOWNLOAD. To force a download, erase the student directory and rerun. Or, rerun and request to dowload that students' specific attempt." % (login, newAttempt, cachedAttempt))
             return
 
+        
         archiveFile  = os.path.join(directory,login+exten)
 
         # Delete existing archive if it exists.
@@ -467,8 +523,8 @@ class canvas():
             if os.path.exists(archiveFile):
                 os.unlink(archiveFile)
         # Download the file
-        print("%-12s downloading attempt %d submitted %s" % (login, newAttempt, 
-              self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))))
+        print("%-12s downloading attempt %d submitted %s (replacing attempt %d)" % (login, newAttempt, 
+              self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)), cachedAttempt))
         try:
             urllib.request.urlretrieve(attachment['url'], directory+"/"+login+exten)
         except:
@@ -553,6 +609,17 @@ class canvas():
                     print(fullpath + " is a Apple related folder, removing")
                     shutil.rmtree(fullpath)
 
+    def removeSymLinks(self, subdirName):
+        """Remove symbolic links anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:
+                fullpath = os.path.join(dirpath, f)
+                if os.path.islink(fullpath):
+                        print(fullpath + " is a symlink, removing")
+                        os.unlink(fullpath)
+
+
+                    
     def removeBackupFiles(self, subdirName):
         """Remove unnecessary text-editor backup files anywhere in the subdirectory."""
         for dirpath, dnames, fnames in os.walk(subdirName):
@@ -620,6 +687,11 @@ class canvas():
 
         if os.path.exists(destDir):
             shutil.rmtree(destDir)
+
+        # Ensure destination directory exists. If a student submits an
+        # empty tgz file, for example, the code below won't create the
+        # empty directory.
+        os.mkdir(destDir)
         try:
             # tarfile.is_tarfile() and zipfile.is_zipfile() functions
             # are available, but sometimes it misidentifies files (for
@@ -647,7 +719,7 @@ class canvas():
                 # file submissions from getting put into
                 # subdirectories. Removing this line may break a
                 # variety of different elements of the autograder.
-                os.mkdir(destDir)
+                print("Trying to move "+filename+" to "+destDir)
                 shutil.move(filename, destDir)
                 print(destDir + ": No need to extract " + filename);
         except:
@@ -668,6 +740,7 @@ class canvas():
                 json.dump(metadata, f, indent=4)
         else: # If we did extract files into a subdirectory
             # Remove files we don't need or want.
+            self.removeSymLinks(destDir)
             self.removeELFs(destDir)
             self.removeDSStore(destDir)
             self.removeBackupFiles(destDir)
@@ -676,22 +749,26 @@ class canvas():
             self.removeEndings(destDir, [".zip", ".tgz", ".tar", ".tar.gz", ".a"])
             
             # Remove unnecessary subdirectories
-            onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
-            onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]
-            print(destDir + ": Contains %d file(s) and %d dir(s)"%(len(onlyfiles), len(onlydirs)))
-            # If submission included all files in a subdirectory, remove the subdirectory
-            if len(onlyfiles) == 0 and len(onlydirs) == 1:
-                print(destDir + ": Removing unnecessary subdirectory.")
-                # Delete previous temporary directory if it exists
-                shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
-                # Move subfolder into temporary directory
-                tmpDir = "/tmp/autograder-tmp-dir/"+onlydirs[0]
-                shutil.move(destDir+"/"+onlydirs[0], tmpDir)
-                # Move the files files in the temporary directory into the destination directory
-                for f in os.listdir(tmpDir):
-                    shutil.move(tmpDir+"/"+f, destDir)
-                # Remove temporary directory
-                shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
+            while True:
+                onlyfiles = [ f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir,f)) ]
+                onlydirs = [ f for f in os.listdir(destDir) if os.path.isdir(os.path.join(destDir,f)) ]
+                print(destDir + ": Contains %d file(s) and %d dir(s)"%(len(onlyfiles), len(onlydirs)))
+                # If submission included all files in a subdirectory, remove the subdirectory
+                if len(onlyfiles) == 0 and len(onlydirs) == 1:
+                    print(destDir + ": Removing unnecessary subdirectory named '"+onlydirs[0]+"'")
+                    # Delete previous temporary directory if it exists
+                    shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
+                    # Move subfolder into temporary directory
+                    tmpDir = "/tmp/autograder-tmp-dir/"+onlydirs[0]
+                    shutil.move(destDir+"/"+onlydirs[0], tmpDir)
+                    # Move the files files in the temporary directory into the destination directory
+                    for f in os.listdir(tmpDir):
+                        #print("moving: "+tmpDir+"/"+f+" to "+destDir)
+                        shutil.move(tmpDir+"/"+f, destDir)
+                    # Remove temporary directory
+                    shutil.rmtree("/tmp/autograder-tmp-dir", ignore_errors=True)
+                else:
+                    break; # done removing nested single directories
 
             # Remove original metadata file, write one out in the
             # subdirectory.
@@ -700,6 +777,12 @@ class canvas():
             with open(metadataFileDestDir, "w") as f:
                 json.dump(metadata, f, indent=4)
 
+            # Don't allow others to read/write/execute files or directories
+            for dirpath, dnames, fnames in os.walk(destDir):
+                for path in dnames+fnames:
+                    path = os.path.join(dirpath, path)
+                    currentPerm = os.stat(path).st_mode
+                    os.chmod(path, currentPerm & ~(stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH))
 
     def printCourseIds(self, courses):
         for i in courses:
@@ -710,6 +793,9 @@ class canvas():
             print("%10s %s"%(str(i['id']), i['name']))
   
     def printStudentIds(self, students):
+        # It would be nice if we could print out the name of the
+        # section that the student is in, but it isn't easily
+        # available here.
         for i in students:
             print("%10s %10s %s"%(str(i['id']), i['login_id'], i['name']))
 
@@ -718,7 +804,7 @@ class canvas():
             print("Warning: You are setting the default courseId to None.")
         self.courseId = courseId;
 
-    def downloadAssignment(self, courseName, assignmentName, subdirName, userid=None, attempt=-1):
+    def downloadAssignment(self, courseName, assignmentName, subdirName, userid=None, attempt=-1, acceptLate=False):
         # Find the course
         courses = self.getCourses()
         courseId = self.findCourseId(courses, courseName)
@@ -770,7 +856,7 @@ class canvas():
         submissions = self.getSubmissions(courseId=courseId, assignmentId=assignmentId, studentId=studentId)
 
         # Filter out the submissions that we want to grade (newest, non-late submission)
-        submissionsToGrade = self.findSubmissionsToGrade(submissions, attempt)
+        submissionsToGrade = self.findSubmissionsToGrade(submissions, attempt, acceptLate)
 
         # Download the submissions
         self.downloadSubmissions(submissionsToGrade, students, subdirName, group_memberships)

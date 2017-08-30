@@ -12,8 +12,13 @@ if len(sys.argv) < 2:
     print("Each action allows can be passed an optional argument:")
 
     print()
+    print(" download")
     print(" download [username attempt#]")
-    print("     Download the any updated submissions (ignoring late submissions)")
+    print("     Download the any updated submissions (ignores late submissions unless you specifically specify an attempt that was late.)")
+
+    print()
+    print(" downloadlate")
+    print("     Download the any updated submissions (including late submissions)")
 
     print()
     print(" stats [usernames...]")
@@ -21,8 +26,16 @@ if len(sys.argv) < 2:
     
     print()
     print(" email [usernames...]")
-    print("     Sends emails containing the AUTOGRADE.txt reports to students as needed.")
+    print("     Sends emails containing the AUTOGRADE.html reports to students as needed.")
 
+    print()
+    print(" emailsent [usernames...]")
+    print("     Makes the autograder believe that it has already sent the student an email.")
+
+    print()
+    print(" emailClearCache [usernames...]")
+    print("     Makes the autograder believe that no emails have been sent.")
+    
     print()
     print(" lock [usernames...]")
     print(" unlock [usernames...]")
@@ -30,12 +43,17 @@ if len(sys.argv) < 2:
 
     print()
     print(" regrade [usernames...]")
-    print("     Erase all AUTOGRADE.txt files to force complete regrading. Useful when the ag-grade.py script is changed by the instructor.")
-    
-    print()
-    print(" emailClearCache [usernames...]")
-    print("     Forces new emails to get sent to all students (this option is usually only useful for debugging the autograder)")
+    print("     Erase all AUTOGRADE.html files to force complete regrading. Useful when the ag-grade.py script is changed by the instructor.")
 
+    print()
+    print(" view username")
+    print("     View autograder report via command line.")
+
+    print()
+    print(" viewgui username")
+    print("     View autograder report via web browser.")
+
+    
     sys.exit(1)
 
 config = autograder.config()
@@ -68,7 +86,7 @@ def lock(dirs):
     changeLock(dirs, 1)
 def regrade(dirs):
     for thisDir in dirs:
-        agfile = os.path.join(thisDir, "AUTOGRADE.txt")
+        agfile = os.path.join(thisDir, "AUTOGRADE.html")
         if os.path.exists(agfile):
             os.unlink(agfile)
     # Whenever a new autograde report is generated, we change the
@@ -90,10 +108,22 @@ def emailClearCache(dirs):
             json.dump(metadata, f, indent=4)
 
 
+def emailSent(dirs):
+    for thisDir in dirs:
+        metadataFile = thisDir + "/AUTOGRADE.json"
+        metadata = {}
+        if os.path.exists(metadataFile):
+            with open(metadataFile, "r") as f:
+                metadata = json.load(f)
+        metadata['emailSent']=1
+        with open(metadataFile, "w") as f:
+            json.dump(metadata, f, indent=4)
+
+
                             
 def stats(dirs):
     score_list=[]
-    print("%-12s %5s %9s %14s %5s %5s %5s %5s" % ("name", "agPts", "canvasPts", "SubmitTime", "atmpt", "late", "lock", "email"))
+    print("%-12s %5s %9s %9s %14s %5s %5s %5s %5s" % ("name", "agPts", "agPtsOrig", "canvasPts", "SubmitTime", "atmpt", "late", "lock", "email"))
     for d in dirs:
         metadataFile = d + "/AUTOGRADE.json"
         metadata = {}
@@ -107,19 +137,26 @@ def stats(dirs):
             emailed=""
 
         score="  ---"
-        if os.path.exists(os.path.join(d, "AUTOGRADE.txt")):
-            with open(os.path.join(d, "AUTOGRADE.txt"), 'r') as f:
-                match = re.search("TOTAL.*: (.*)", f.read())
-                if match.group(1):
-                    score_int = int(match.group(1).strip())
-                    score_list.append(score_int)
-                    score = "%5d" % score_int
+        if 'autograderScore' in metadata and os.path.exists(os.path.join(d, "AUTOGRADE.html")):
+                score = "%5d" % metadata['autograderScore']
+                score_list.append(int(metadata['autograderScore']))
 
-        canvasScore="     ---"
+        scoreOrig="      ---"
+        if 'autograderScorePreAdjustment' in metadata and os.path.exists(os.path.join(d, "AUTOGRADE.html")):
+                scoreOrig = "%9d" % metadata['autograderScorePreAdjustment']
+
+                
+        canvasScore="    --- "
         if 'canvasSubmission' in metadata:
-            if metadata['canvasSubmission']['workflow_state'] == "graded":
-                canvasScore_int = int(metadata['canvasSubmission'].get('score', "0"))
-                canvasScore = "%9d" % canvasScore_int
+            canvasScore_string = metadata['canvasSubmission'].get('score', "0")
+            if canvasScore_string:
+                canvasScore_int = int(canvasScore_string)
+                
+                if metadata['canvasSubmission']['grade_matches_current_submission'] == False:                
+                    canvasScore = "%8d*"%canvasScore_int
+                else:
+                    canvasScore = "%8d "%canvasScore_int
+            
 
 
         attempt=0
@@ -140,7 +177,7 @@ def stats(dirs):
                 utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
                 timeString = canvas.canvas.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))
 
-        print("%-12s %5s %9s %14s %5d %5s %5s %5s" % (d, score, canvasScore, timeString, attempt, late, locked, emailed))
+        print("%-12s %5s %9s %9s %14s %5d %5s %5s %5s" % (d, score, scoreOrig, canvasScore, timeString, attempt, late, locked, emailed))
 
     print("Submission count: %d" % len(dirs))
 
@@ -173,7 +210,7 @@ def emailLogout():
     global emailSession
     emailSession.quit()
 
-def emailStudent(senderEmail, studentUsername, subject, text):
+def emailStudent(senderEmail, studentUsername, subject, htmlattach, message):
     if '@' in studentUsername:
         recipients = [ studentUsername ]
     else:
@@ -200,18 +237,49 @@ def emailStudent(senderEmail, studentUsername, subject, text):
     msg['Subject'] = subject
     msg['From'] = formataddr( (emailFromName, emailFrom) )
     msg['To'] = ', '.join(recipients)
-    part = MIMEBase("text", "plain")
-    part.set_payload(text)
+    part = MIMEBase("text", "html")
+    part.set_payload(htmlattach)
     encoders.encode_base64(part)
-    part.add_header('Content-Disposition', 'attachment; filename="{0}"'.format("AUTOGRADE.txt"))
+    part.add_header('Content-Disposition', 'attachment; filename="{0}"'.format("AUTOGRADE.html"))
     msg.attach(part)
 
-    part = MIMEText("Your autograder report is attached.")
-#    part = MIMEText("Your final autograder report is attached. If your assignment is not graded on Canvas yet, you can leave a comment on your submission (you will need to go to a page which allows you to view your previous submissions to find the place to leave a comment!). The instructor will see your comment when they are giving you your grade. If you have received a grade on Canvas and still have questions or concerns, email me!")
+    part = MIMEText(message)
     msg.attach(part)
     emailSession.sendmail(senderEmail, recipients, msg.as_string())
 
 
+def getAllScores():
+    dirs = [name for name in os.listdir(".") if os.path.isdir(name)]
+    allScores = []
+    for d in dirs:
+        metadataFile = d + "/AUTOGRADE.json"
+        metadata = {}
+        if os.path.exists(metadataFile):
+            with open(metadataFile, "r") as f:
+                metadata = json.load(f)
+        if 'autograderScore' in metadata and os.path.exists(os.path.join(d, "AUTOGRADE.html")):
+            allScores.append(int(metadata['autograderScore']))
+    allScores.sort()
+    return allScores;
+
+def getSumOfAttempts():
+    dirs = [name for name in os.listdir(".") if os.path.isdir(name)]
+    attempts = 0;
+    for d in dirs:
+        metadataFile = d + "/AUTOGRADE.json"
+        metadata = {}
+        if os.path.exists(metadataFile):
+            with open(metadataFile, "r") as f:
+                metadata = json.load(f)
+        if 'canvasSubmission' in metadata:
+            attempts += int(metadata['canvasSubmission'].get('attempt', 0))
+
+    return attempts;
+    
+
+
+
+import statistics
 def emailSend(dirs):
     # Login to email server
     if '@' in emailFrom:
@@ -220,19 +288,37 @@ def emailSend(dirs):
         senderEmail = emailFrom + '@' + domainName
     emailLogin(senderEmail, emailPassword)
 
+    message = "Your autograder report is attached. "
+    allScores = getAllScores()
+    totalAttempts = getSumOfAttempts()
+    if len(allScores) == 1:
+        message += "Congratulations. You are the first and only student to have submitted something. "
+    elif len(allScores) > 1:
+        message += "%d students have made %d submissions for this assignment (an average of about %d submissions per student). " % (len(allScores), totalAttempts, int(round(totalAttempts/len(allScores))))
+
+    if len(allScores) > 5:
+        message += "The average score is %d. " % int(round(statistics.mean(allScores)))
+        message += "The median score is %d. " % int(round(statistics.median(allScores)))
+        try:
+            message += "The most common score is %d. " % statistics.mode(allScores)
+        except statistics.StatisticsError:
+            # If there is more than one mode, this exception occurs.
+            pass
+        message += "The scores range from %d to %d. " % (allScores[0], allScores[-1])
+
     # send email messages
     for thisDir in dirs:
-        agFilename = thisDir + "/AUTOGRADE.txt"
+        agFilename = thisDir + "/AUTOGRADE.html"
         metadataFile = thisDir + "/AUTOGRADE.json"
         metadata = {}
         if os.path.exists(metadataFile):
             with open(metadataFile, "r") as f:
                 metadata = json.load(f)
         if metadata.get('emailSent', 0):
-            print("%-12s SKIPPING - Already emailed a report." % thisDir)
+            print("%-12s SKIPPING - Already emailed most recent report." % thisDir)
             continue;
         if not os.path.exists(agFilename):
-            print("%-12s SKIPPING - AUTOGRADE.txt is missing." % thisDir)
+            print("%-12s SKIPPING - AUTOGRADE.html is missing." % thisDir)
             continue;
 
         # Start by assuming directory name is the username
@@ -249,13 +335,13 @@ def emailSend(dirs):
             for student in group:
                 print("%-12s Sending message to group member %s" % (thisDir, student['login_id']))
                 with open(agFilename, 'r') as content_file:
-                    content = content_file.read()
-                    emailStudent(senderEmail, student['login_id'], emailSubject, content)
+                    attachment = content_file.read()
+                    emailStudent(senderEmail, student['login_id'], emailSubject, attachment, message)
         else:
             print("%-12s Sending message to %s" % (thisDir, emailToAddr))
             with open(agFilename, 'r') as content_file:
                 content = content_file.read()
-                emailStudent(senderEmail, emailToAddr, emailSubject, content)
+                emailStudent(senderEmail, emailToAddr, emailSubject, content, message)
 
         metadata['emailSubject'] = emailSubject
         metadata['emailCtime'] = str(datetime.datetime.now().ctime())
@@ -312,6 +398,8 @@ elif sys.argv[1] == 'download':
     c = canvas.canvas()
     if len(sys.argv) == 2:
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName)
+    elif len(sys.argv) == 3:
+        c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, userid=sys.argv[2])
     elif len(sys.argv) == 4:
         # Delete the any existing submission with the given name
         if os.path.exists(os.path.join(subdirName, sys.argv[2])):
@@ -322,21 +410,63 @@ elif sys.argv[1] == 'download':
         print(" ag.py download   --> downloads all non-late submissions")
         print(" ag.py download username attempt# --> downloads one specific submission (even if it is late)")
         exit(1)
-    
+
+elif sys.argv[1] == 'downloadlate':
+    c = canvas.canvas()
+    if len(sys.argv) == 2:
+        c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, acceptLate=True)
+    if len(sys.argv) == 3:
+        # Delete the any existing submission with the given name
+        if os.path.exists(os.path.join(subdirName, sys.argv[2])):
+            shutil.rmtree(os.path.join(subdirName, sys.argv[2]))
+        c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, userid=sys.argv[2], acceptLate=True)
+    else:
+        print("Usage:")
+        print(" ag.py downloadlate   --> downloads all submissions (including late ones)")
+        print(" ag.py downloadlate username  --> download newest submission from user (including late ones)")
+        print(" Use the 'download' command to download a specific submission")
+        exit(1)
+        
 elif sys.argv[1] == 'email':
     os.chdir(subdirName)
     if len(sys.argv) > 2:
         emailSend(sys.argv[2:])
     else:
         emailSend(dirs)
+
+elif sys.argv[1] == 'emailsent':
+    os.chdir(subdirName)
+    if len(sys.argv) > 2:
+        emailSent(sys.argv[2:])
+    else:
+        emailSent(dirs)
+
+
+elif sys.argv[1] == 'view':
+    if len(sys.argv) == 3:
+        path = os.path.join(subdirName, sys.argv[2], "AUTOGRADE.html")
+        print("viewing: %s"%path)
+        os.system('links -codepage utf-8 -dump -width %d %s | less' %
+                  (shutil.get_terminal_size((80,20)).columns,
+                   path))
+    else:
+        print("Usage:")
+        print(" ag.py view username")
+        exit(1)
+
+elif sys.argv[1] == 'viewgui':
+    if len(sys.argv) == 3:
+        path = os.path.join(subdirName, sys.argv[2], "AUTOGRADE.html")
+        print("viewing: %s"%path)
+        os.execvp('xdg-open', ['xdg-open',path])
+    else:
+        print("Usage:")
+        print(" ag.py viewgui username")
+        exit(1)
+
+        
+        
 else:
     print("Unknown action: %s" % sys.argv[1])
     exit(1)
-
-
-
-
-
-
-
     

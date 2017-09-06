@@ -58,7 +58,7 @@ class canvas():
             else:
                 urlString = url
         
-            print("Requesting: " +urlString)
+            #print("Requesting: " +urlString)
             request = urllib.request.Request(urlString)
             request.add_header("Authorization", "Bearer " + self.CANVAS_TOKEN);
             response = urllib.request.urlopen(request)
@@ -934,10 +934,25 @@ if __name__ == "__main__":
     #        submissionsToGrade = canvas.findSubmissionsToGrade(submissions)
     #        canvas.printSubmissionSummary(submissionsToGrade, students)
 
+            canvas.prettyPrint(canvas.gradeableStudents(assignmentId=assignmentId))
 
         elif action == "assignmentDownload":
             canvas.downloadAssignment(args.course, args.assignment, "canvas-submissions")
 
+        # elif action == "testCommenting":
+        #     courseId = canvas.findCourseId(courses, args.course)
+        #     canvas.setDefaultCourseId(courseId)
+
+        #     assignments = canvas.getAssignments()
+        #     students = canvas.getStudents()
+        #     assignmentId = canvas.findAssignmentId(assignments, args.assignment)
+        #     submissions = canvas.getSubmissions(assignmentId=assignmentId)
+
+        #     canvas.commentOnSubmission(courseId=courseId, assignmentId=assignmentId, studentId=3924612, comment="hello world")
+        #     canvas.gradeSubmission(courseId=courseId, assignmentId=assignmentId, studentId=3924612, grade=1)
+
+
+            
         else:
             print("Unknown action: " + action)
             parser.print_help()

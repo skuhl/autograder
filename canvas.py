@@ -32,14 +32,15 @@ class canvas():
     CANVAS_TOKEN = None
     courseId = 0;
 
-    def __init__(self, token=None, courseId=None):
+    def __init__(self, token=None, api=None, courseId=None):
         canvasTokenFile = os.path.expanduser("~/.canvas-token")
-        if token:
+        if token and api:
             self.CANVAS_TOKEN = str(token)
+            self.CANVAS_API = str(api)
         else:
             with open(canvasTokenFile) as f:
                 exec(f.read())
-
+                
         if not self.CANVAS_TOKEN:
             print("Canvas token not found.")
             exit()
@@ -100,14 +101,15 @@ class canvas():
             request = urllib.request.Request(urlString, method='PUT')
             request.add_header("Authorization", "Bearer " + self.CANVAS_TOKEN);
             response = urllib.request.urlopen(request)
-            #print(response.readall().decode('utf-8'))
-            # json_string = response.readall().decode('utf-8');
-            # retVal = json.loads(json_string)
+            json_string = response.read().decode('utf-8');
+            retVal = dict(json.loads(json_string))
+            #print (retVal)
             if(response.status == 200):
                 return True
             else:
                 return False
-        except:
+        except Exception as ex:
+            print(ex)
             e = sys.exc_info()[0]
             print(e)
             raise
@@ -121,6 +123,7 @@ class canvas():
         allCourses = self.makeRequest("courses?"+
                                       urllib.parse.urlencode({"per_page":"100",
                                                               "page": "1"}))
+        #self.prettyPrint(allCourses)
         return allCourses
 
     def getStudents(self, courseId=None):
@@ -132,6 +135,7 @@ class canvas():
         students =  self.makeRequest("courses/"+str(courseId)+"/students?"+
                                      urllib.parse.urlencode({"per_page":"100",
                                                              "page": "1"}))
+        #self.prettyPrint(students)
 	# Filter out students who are still "pending".
 	# These "pending" students do not have a login_id, which some of this code relies on
         nonPendingStudents = []
@@ -147,14 +151,15 @@ class canvas():
         allAssignments = self.makeRequest("courses/"+str(courseId)+"/assignments?"+
                                           urllib.parse.urlencode({"per_page":"100",
                                                                   "page": "1"}))
+        #self.prettyPrint(allAssignments)
         return allAssignments
 
     def commentOnSubmission(self, courseId, assignmentId, studentId, comment):
         courseId = courseId or self.courseId
-        if courseId == None:
+        if type(courseId) != int:
             print("Can't get comment on submissions without a courseId.")
             exit(1)
-        if assignmentId == None or studentId == None:
+        if type(assignmentId) != int or type(studentId) != int:
             printf("Can't comment on a submission without a assignment ID and a student ID.")
             exit(1)
 
@@ -164,6 +169,22 @@ class canvas():
                      "/submissions/"+str(studentId)+"?"+
                      urllib.parse.urlencode({"comment[text_comment]" : comment}))
 
+    def gradeSubmission(self, courseId, assignmentId, studentId, grade):
+        courseId = courseId or self.courseId
+        if type(courseId) != int:
+            print("Can't get comment on submissions without a courseId.")
+            exit(1)
+        if type(assignmentId) != int or type(studentId) != int:
+            printf("Can't comment on a submission without a assignment ID and a student ID.")
+            exit(1)
+
+        
+        self.makePut("courses/"+str(courseId)+
+                     "/assignments/"+str(assignmentId)+
+                     "/submissions/"+str(studentId)+"?"+
+                     urllib.parse.urlencode({"submission[posted_grade]" : grade}))
+
+        
     
     def getSubmissions(self, courseId=None, assignmentId=None, studentId=None):
         """Gets all submissions for a course, all submissions for a student in a course, or all submissions for a specific assignment+student combination."""
@@ -186,7 +207,21 @@ class canvas():
         else:
             return self.makeRequest("courses/"+str(courseId)+"/students/submissions?assignment_ids[]="+str(assignmentId)+"&"+commonargs)
 
-    
+    def gradeableStudents(self, courseId=None, assignmentId=None):
+        """Lists all gradeable students for this assignment. Since some assignments are only available to some students, we may not be able to grade."""
+        courseId = courseId or self.courseId
+        if courseId == None:
+            print("Can't find courseId to retrieve list of gradeable students.")
+            exit()
+        print(str(assignmentId))
+        if type(assignmentId) != int:
+            print("assignmentId must be specified to retrieve list of gradeable students")
+            exit()
+
+
+        return self.makeRequest("courses/"+str(courseId)+"/assignments/"+str(assignmentId)+"/gradeable_students")
+
+        
     def findStudent(self, students, searchString):
         """Returns a student object that matches the students name, username, or ID. The searchString must match one of the fields in the student object exactly!"""
         searchString = str(searchString).lower()
@@ -194,12 +229,15 @@ class canvas():
         #self.prettyPrint(students)
         #exit(1)
         for s in students:
-            if s['name'].lower()          == searchString or \
-               s['short_name'].lower()    == searchString or \
-               s['sortable_name'].lower() == searchString or \
-               s['login_id'].lower()      == searchString or \
-               str(s['id']) == searchString:
-                return s
+            try:
+                if s['name'].lower()          == searchString or \
+                s['short_name'].lower()    == searchString or \
+                s['sortable_name'].lower() == searchString or \
+                s['login_id'].lower()      == searchString or \
+                str(s['id']) == searchString:
+                    return s
+            except:
+                print("ProblemStudent:"+s)
 
         # print("Failed to find student: " + searchString)
         return None
@@ -208,18 +246,24 @@ class canvas():
         """Returns an assignment object that matches the assignment name out of a list of assignment objects."""
         searchString = searchString.lower()
         for a in assignments:
-            if a['name'].lower() == searchString or \
-               str(a['id']) == searchString:
-                return a
+            try:
+                if a['name'].lower() == searchString or \
+                str(a['id']) == searchString:
+                    return a
+            except:
+                pass
         return None
 
     def findCourse(self, courses, searchString):
         """Returns an course object that matches the course name out of a list of course objects."""
         searchString = searchString.lower()
         for c in courses:
-            if c['name'].lower() == searchString or \
-               str(c['id'])      == searchString:
-                return c
+            try:
+                if c['name'].lower() == searchString or \
+                str(c['id'])      == searchString:
+                    return c
+            except:
+                pass
         return None
 
     def findStudentId(self, students, searchString):
@@ -482,7 +526,6 @@ class canvas():
             print("%-12s WARNING: You requested attempt %2d; directory contains newer attempt %2d; SKIPPING DOWNLOAD. To force a download, erase the student directory and rerun. Or, rerun and request to dowload that students' specific attempt." % (login, newAttempt, cachedAttempt))
             return
 
-        
         archiveFile  = os.path.join(directory,login+exten)
 
         # Delete existing archive if it exists.

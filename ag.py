@@ -14,11 +14,11 @@ if len(sys.argv) < 2:
     print()
     print(" download")
     print(" download [username attempt#]")
-    print("     Download the any updated submissions (ignores late submissions unless you specifically specify an attempt that was late.)")
+    print("     Download any updated submissions (ignores late submissions unless you specifically specify an attempt that was late.)")
 
     print()
-    print(" downloadlate")
-    print("     Download the any updated submissions (including late submissions)")
+    print(" downloadlate [username]")
+    print("     Download any updated submissions (including late submissions)")
 
     print()
     print(" stats [usernames...]")

@@ -132,18 +132,61 @@ class canvas():
         if courseId == None:
             print("Can't getStudents without a courseId.")
             exit()
-        students =  self.makeRequest("courses/"+str(courseId)+"/students?"+
+
+        # Get a listing of students (include student name, id, username, etc).
+        students =  self.makeRequest("courses/"+str(courseId)+"/users?enrollment_type[]=student&"+
                                      urllib.parse.urlencode({"per_page":"100",
                                                              "page": "1"}))
         #self.prettyPrint(students)
-	# Filter out students who are still "pending".
-	# These "pending" students do not have a login_id, which some of this code relies on
+        
+        # Get a listing of sections (with students included in each section).
+        sections =  self.makeRequest("courses/"+str(courseId)+"/sections?include[]=students&"+
+                                     urllib.parse.urlencode({"per_page":"100",
+                                                             "page": "1"}))
+        #self.prettyPrint(sections)
+        
+        # Filter out students who are still "pending".  These
+        # "pending" students do not have a login_id, which some of
+        # this code relies on.
         nonPendingStudents = []
         for s in students:
             if 'login_id' in s:
                 nonPendingStudents.append(s)
+        students = nonPendingStudents
+        
+        # Filter out students who appear in the list twice. This can
+        # happen if they are enrolled in two different sections.
+        nonDupStudents = []
+        studentIds = []
+        for s in students:
+            if s['id'] not in studentIds:
+                studentIds.append(s['id'])
+                nonDupStudents.append(s)
+        students = nonDupStudents
 
-        return nonPendingStudents
+        # Go through each student, find which sections they are in,
+        # and add that as a piece of data in the data we
+        # return. Typically students would only be in one section, but
+        # this code should also work if students are in multiple
+        # sections.
+        for s in students:
+            studentSections = [] # The names of the sections the student is in.
+
+            # For each section in the class, go through the students
+            # in that section and check if our student is in it. If
+            # so, add the section name to our array.
+            for sect in sections:
+                for studentInSec in sect['students']:
+                    if studentInSec['id'] == s['id']:
+                        studentSections.append(sect['name'])
+
+            s['kuhl_sections'] = ", ".join(map(str, studentSections))
+
+
+        # Sort student list by username
+        students = sorted(students, key=lambda k: k['login_id'])
+            
+        return students
 
     def getAssignments(self, courseId=None):
         """Gets list of assignments in a course."""
@@ -805,11 +848,9 @@ class canvas():
             print("%10s %s"%(str(i['id']), i['name']))
   
     def printStudentIds(self, students):
-        # It would be nice if we could print out the name of the
-        # section that the student is in, but it isn't easily
-        # available here.
         for i in students:
-            print("%10s %10s %s"%(str(i['id']), i['login_id'], i['name']))
+            #print(i)
+            print("%10s %-10s %-25s %s"%(str(i['id']), i['login_id'], i['name'], i['kuhl_sections']))
 
     def setDefaultCourseId(self, courseId):
         if courseId == None:

@@ -837,7 +837,9 @@ class canvas():
                 for path in dnames+fnames:
                     path = os.path.join(dirpath, path)
                     currentPerm = os.stat(path).st_mode
-                    os.chmod(path, currentPerm & ~(stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH))
+                    os.chmod(path, currentPerm & ~(stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP))
+                currentPerm = os.stat(dirpath).st_mode
+                os.chmod(dirpath, currentPerm & ~(stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP))
 
     def printCourseIds(self, courses):
         for i in courses:

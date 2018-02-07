@@ -153,7 +153,6 @@ class Command(object):
                     # produce an OSerror when the program doesn't
                     # exist. So, we raise an OSError ourself if we
                     # can't find the executable.
-                    print(self.cmd[0])
                     if autogradeobj.which(self.cmd[0]) == None:
                         raise OSError
 
@@ -215,11 +214,11 @@ class Command(object):
                 if threading.activeCount() == 1:
                     import pwd
                     username = pwd.getpwuid(autograderUid)[0]
-                    subprocess.call(['killall', '-u', username, '-INT'])
+                    subprocess.call(['killall', '-u', username, '-SIGINT'])
                     time.sleep(.1)
-                    subprocess.call(['killall', '-u', username, '-STOP'])
+                    subprocess.call(['killall', '-u', username, '-SIGSTOP'])
                     time.sleep(.1)
-                    subprocess.call(['killall', '-u', username, '-KILL'])
+                    subprocess.call(['killall', '-u', username, '-SIGKILL'])
 
             #print("prepare thread - %s"%str(self.cmd));
             thread = threading.Thread(target=target)
@@ -344,7 +343,7 @@ class autograder():
         self.log("table td:nth-child(2) { color: darkred; font-weight: bold; font-size: 130%; text-align: center }")
 
         self.log("table { width: 100%; }")
-        self.log("div.preformatcode { max-height: 20em; width: 90%; overflow: auto; background-color: #eee; resize: both; }")
+        self.log("div.preformatcode { max-height: 20em; width: 80vw; overflow: auto; background-color: #eee; resize: both; }")
         self.log("h2 { margin: 0px; font-size: 130%; }")
         self.log("pre { margin: 2px; white-space: pre-wrap}")
         self.log("body { font-family: sans }")
@@ -355,7 +354,7 @@ class autograder():
         self.log("<h1>%s</h1>"%username)
         self.log("<p><i>Gmail users:</i> This page may be easier to read if you download the file and then view it (Gmail removes some of the formatting).")
         self.log("<table>")
-        self.log("<tr><th>Line<br>#</th><th>Points</th><th>Details</th></tr>")
+        self.log("<tr><th></th><th>Points</th><th>Details</th></tr>")
 
         self.log_addEntry("Autograder ran at: %s" % str(datetime.datetime.now().ctime()))
 

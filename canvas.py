@@ -176,9 +176,10 @@ class canvas():
             # in that section and check if our student is in it. If
             # so, add the section name to our array.
             for sect in sections:
-                for studentInSec in sect['students']:
-                    if studentInSec['id'] == s['id']:
-                        studentSections.append(sect['name'])
+                if sect['students']:  # if section has students
+                    for studentInSec in sect['students']:
+                        if studentInSec['id'] == s['id']:
+                            studentSections.append(sect['name'])
 
             s['kuhl_sections'] = ", ".join(map(str, studentSections))
 

@@ -123,7 +123,7 @@ def emailSent(dirs):
                             
 def stats(dirs):
     score_list=[]
-    print("%-12s %5s %9s %9s %14s %5s %5s %5s %5s" % ("name", "agPts", "agPtsOrig", "canvasPts", "SubmitTime", "atmpt", "late", "lock", "email"))
+    print("%-12s %5s %9s %9s %5s %4s %4s %5s %s" % ("name", "agPts", "agPtsOrig", "canvasPts", "atmpt", "late", "lock", "email", "SubmitTime"))
     for d in dirs:
         metadataFile = d + "/AUTOGRADE.json"
         metadata = {}
@@ -134,7 +134,7 @@ def stats(dirs):
         if metadata.get('emailSent', 0):
             emailed="X"
         else:
-            emailed=""
+            emailed="-"
 
         score="  ---"
         if 'autograderScore' in metadata and os.path.exists(os.path.join(d, "AUTOGRADE.html")):
@@ -161,8 +161,8 @@ def stats(dirs):
 
         attempt=0
         timeString=''
-        late=''
-        locked=''
+        late='-'
+        locked='-'
         if 'canvasSubmission' in metadata:
             attempt = metadata['canvasSubmission'].get('attempt', "0")
             if metadata['canvasSubmission']['late']:
@@ -177,7 +177,7 @@ def stats(dirs):
                 utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
                 timeString = canvas.canvas.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))
 
-        print("%-12s %5s %9s %9s %14s %5d %5s %5s %5s" % (d, score, scoreOrig, canvasScore, timeString, attempt, late, locked, emailed))
+        print("%-12s %5s %9s %9s %5d %4s %4s %5s %s" % (d, score, scoreOrig, canvasScore, attempt, late, locked, emailed, timeString))
 
     print("Submission count: %d" % len(dirs))
 
@@ -294,7 +294,7 @@ def emailSend(dirs):
     if len(allScores) == 1:
         message += "Congratulations. You are the first and only student to have submitted something. "
     elif len(allScores) > 1:
-        message += "%d students have made %d submissions for this assignment (an average of about %d submissions per student). " % (len(allScores), totalAttempts, int(round(totalAttempts/len(allScores))))
+        message += "%d students have made %d submissions for this assignment. " % (len(allScores), totalAttempts)
 
     if len(allScores) > 5:
         message += "The average score is %d. " % int(round(statistics.mean(allScores)))
@@ -446,9 +446,10 @@ elif sys.argv[1] == 'view':
     if len(sys.argv) == 3:
         path = os.path.join(subdirName, sys.argv[2], "AUTOGRADE.html")
         print("viewing: %s"%path)
-        os.system('links -codepage utf-8 -dump -width %d %s | less' %
-                  (shutil.get_terminal_size((80,20)).columns,
-                   path))
+        os.system('links -codepage utf-8 %s' % path)
+#        os.system('links -codepage utf-8 -dump -width %d %s | less -iFXRM' %
+#                  (shutil.get_terminal_size((80,20)).columns,
+#                   path))
     else:
         print("Usage:")
         print(" ag.py view username")

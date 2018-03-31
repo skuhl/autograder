@@ -179,7 +179,7 @@ def stats(dirs):
 
         print("%-12s %5s %9s %9s %5d %4s %4s %5s %s" % (d, score, scoreOrig, canvasScore, attempt, late, locked, emailed, timeString))
 
-    print("Submission count: %d" % len(dirs))
+    print("Submissions shown: %d" % len(dirs))
 
     average = "?"
     media = "?"
@@ -288,23 +288,30 @@ def emailSend(dirs):
         senderEmail = emailFrom + '@' + domainName
     emailLogin(senderEmail, emailPassword)
 
-    message = "Your autograder report is attached. "
-    allScores = getAllScores()
-    totalAttempts = getSumOfAttempts()
-    if len(allScores) == 1:
-        message += "Congratulations. You are the first and only student to have submitted something. "
-    elif len(allScores) > 1:
-        message += "%d students have made %d submissions for this assignment. " % (len(allScores), totalAttempts)
+    message = "Your autograder report is attached.\n\n"
 
+    # count number of dirs. The 'dirs' parameter passed into this
+    # function is just the directories we are supposed to send emails
+    # to.
+    allDirs = [name for name in os.listdir(".") if os.path.isdir(name)]
+    message += "Students with submissions: %d\n" % len(allDirs)
+    allScores = getAllScores()
+    message += "Student submissions which have been autograded: %d\n" % len(allScores)
+    totalAttempts = getSumOfAttempts()
+    message += "Total number of submissions (students can submit multiple times): %d\n" % totalAttempts
+    
     if len(allScores) > 5:
-        message += "The average score is %d. " % int(round(statistics.mean(allScores)))
-        message += "The median score is %d. " % int(round(statistics.median(allScores)))
+        message += "Average score: %d\n" % int(round(statistics.mean(allScores)))
+        message += "Median score: %d\n" % int(round(statistics.median(allScores)))
         try:
-            message += "The most common score is %d. " % statistics.mode(allScores)
+            message += "Most common score is %d\n" % statistics.mode(allScores)
         except statistics.StatisticsError:
             # If there is more than one mode, this exception occurs.
             pass
-        message += "The scores range from %d to %d. " % (allScores[0], allScores[-1])
+        message += "Lowest score: %d\n" % allScores[0]
+        message += "Highest score: %d\n" % allScores[-1]
+    else:
+        message += "Stats on scores are not provided until more students submit and more submissions are autograded.\n"
 
     # send email messages
     for thisDir in dirs:
@@ -340,6 +347,8 @@ def emailSend(dirs):
         else:
             print("%-12s Sending message to %s" % (thisDir, emailToAddr))
             with open(agFilename, 'r') as content_file:
+                if 'autograderScore' in metadata:
+                    message += "\nYour score: %d\n" % metadata['autograderScore']
                 content = content_file.read()
                 emailStudent(senderEmail, emailToAddr, emailSubject, content, message)
 
@@ -417,8 +426,8 @@ elif sys.argv[1] == 'downloadlate':
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, acceptLate=True)
     if len(sys.argv) == 3:
         # Delete the any existing submission with the given name
-        if os.path.exists(os.path.join(subdirName, sys.argv[2])):
-            shutil.rmtree(os.path.join(subdirName, sys.argv[2]))
+        #if os.path.exists(os.path.join(subdirName, sys.argv[2])):
+        #    shutil.rmtree(os.path.join(subdirName, sys.argv[2]))
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, userid=sys.argv[2], acceptLate=True)
     else:
         print("Usage:")

@@ -124,7 +124,17 @@ class canvas():
                                       urllib.parse.urlencode({"per_page":"100",
                                                               "page": "1"}))
         #self.prettyPrint(allCourses)
-        return allCourses
+
+        # Some Canvas users have courses which do not appear to be
+        # complete. Here, we ignore all courses which do not have a
+        # name.
+        validCourses = []
+        for i in allCourses:
+            if "name" in i:
+                validCourses.append(i)
+
+        #self.prettyPrint(validCourses)
+        return validCourses
 
     def getStudents(self, courseId=None):
         """Gets list of students in a course."""

@@ -564,7 +564,7 @@ class canvas():
             print("%-12s skipping download because submission is locked to attempt %d." % (login, cachedAttempt))
             return
         if newAttempt == cachedAttempt:
-            print("%-12s We already have downloaded attempt %2d. Skipping download." % (login, newAttempt))
+            print("%-12s skipping download because we already have attempt %2d." % (login, newAttempt))
             return
         if newAttempt < cachedAttempt:
             print("%-12s WARNING: You requested attempt %2d; directory contains newer attempt %2d; SKIPPING DOWNLOAD. To force a download, erase the student directory and rerun. Or, rerun and request to dowload that students' specific attempt." % (login, newAttempt, cachedAttempt))

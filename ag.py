@@ -195,6 +195,14 @@ def stats(dirs):
         print("Low/average/median/high score: %d/%s/%s/%d" % (min(score_list),
                                                               average, median,
                                                               max(score_list)))
+        try:
+            print("The most common score is %d. " % statistics.mode(score_list))
+        except statistics.StatisticsError:
+            print("There is more than 1 most common score. ")
+            # If there is more than one mode, this exception occurs.
+            pass
+
+        
 emailSession = None
 
 
@@ -296,20 +304,20 @@ def emailSend(dirs):
     allDirs = [name for name in os.listdir(".") if os.path.isdir(name)]
     message += "Students with submissions: %d\n" % len(allDirs)
     allScores = getAllScores()
-    message += "Student submissions which have been autograded: %d\n" % len(allScores)
+    message += "Students with autograder scores: %d\n" % len(allScores)
     totalAttempts = getSumOfAttempts()
     message += "Total number of submissions (students can submit multiple times): %d\n" % totalAttempts
     
     if len(allScores) > 5:
-        message += "Average score: %d\n" % int(round(statistics.mean(allScores)))
-        message += "Median score: %d\n" % int(round(statistics.median(allScores)))
         try:
-            message += "Most common score is %d\n" % statistics.mode(allScores)
+            message += "Most common score (i.e., mode): %d\n" % statistics.mode(allScores)
         except statistics.StatisticsError:
             # If there is more than one mode, this exception occurs.
             pass
-        message += "Lowest score: %d\n" % allScores[0]
         message += "Highest score: %d\n" % allScores[-1]
+        message += "Average score: %d\n" % int(round(statistics.mean(allScores)))
+        message += "Median score: %d\n" % int(round(statistics.median(allScores)))
+        message += "Lowest score: %d\n" % allScores[0]
     else:
         message += "Stats on scores are not provided until more students submit and more submissions are autograded.\n"
 
@@ -322,10 +330,10 @@ def emailSend(dirs):
             with open(metadataFile, "r") as f:
                 metadata = json.load(f)
         if metadata.get('emailSent', 0):
-            print("%-12s SKIPPING - Already emailed most recent report." % thisDir)
+            print("%-12s Skip (Already sent newest report)." % thisDir)
             continue;
-        if not os.path.exists(agFilename):
-            print("%-12s SKIPPING - AUTOGRADE.html is missing." % thisDir)
+        if not os.path.exists(agFilename) or not os.path.exists(metadataFile):
+            print("%-12s Skip (AUTOGRADE.html is missing)." % thisDir)
             continue;
 
         # Start by assuming directory name is the username
@@ -340,17 +348,17 @@ def emailSend(dirs):
         if group:
             # Email every student in the group
             for student in group:
-                print("%-12s Sending message to group member %s" % (thisDir, student['login_id']))
+                print("%-12s Sending (to group member %s)" % (thisDir, student['login_id']))
                 with open(agFilename, 'r') as content_file:
                     attachment = content_file.read()
                     emailStudent(senderEmail, student['login_id'], emailSubject, attachment, message)
         else:
-            print("%-12s Sending message to %s" % (thisDir, emailToAddr))
+            print("%-12s Sending" % (thisDir))
             with open(agFilename, 'r') as content_file:
                 if 'autograderScore' in metadata:
-                    message += "\nYour score: %d\n" % metadata['autograderScore']
+                    message_with_grade = message + "\nYour score: %d\n" % metadata['autograderScore']
                 content = content_file.read()
-                emailStudent(senderEmail, emailToAddr, emailSubject, content, message)
+                emailStudent(senderEmail, emailToAddr, emailSubject, content, message_with_grade)
 
         metadata['emailSubject'] = emailSubject
         metadata['emailCtime'] = str(datetime.datetime.now().ctime())
@@ -454,8 +462,12 @@ elif sys.argv[1] == 'emailsent':
 elif sys.argv[1] == 'view':
     if len(sys.argv) == 3:
         path = os.path.join(subdirName, sys.argv[2], "AUTOGRADE.html")
-        print("viewing: %s"%path)
-        os.system('links -codepage utf-8 %s' % path)
+        if os.path.exists(path):
+            print("Viewing: %s"%path)
+            os.system('links -codepage utf-8 %s' % path)
+        else:
+            print("Can't view file: %s"%path)
+        
 #        os.system('links -codepage utf-8 -dump -width %d %s | less -iFXRM' %
 #                  (shutil.get_terminal_size((80,20)).columns,
 #                   path))
@@ -467,8 +479,11 @@ elif sys.argv[1] == 'view':
 elif sys.argv[1] == 'viewgui':
     if len(sys.argv) == 3:
         path = os.path.join(subdirName, sys.argv[2], "AUTOGRADE.html")
-        print("viewing: %s"%path)
-        os.execvp('xdg-open', ['xdg-open',path])
+        if os.path.exists(path):
+            print("Viewing: %s"%path)
+            os.execvp('xdg-open', ['xdg-open',path])
+        else:
+            print("Can't view file: %s"%path)
     else:
         print("Usage:")
         print(" ag.py viewgui username")

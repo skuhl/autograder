@@ -17,10 +17,11 @@ import re
 # then have the script automatically switch to a different user
 # account before running the submitted code. Changing this to True
 # also requires that you set the user ids correctly.
-switchUser=True
+switchUser=False
 
-# The id of the user that the program is normally run with.
+# The id of the user that the program is normally run with. Use "id" command to retrieve these.
 normalUid=1000
+normalGid=1000
 
 # The id of the user that the submissions should be run as.
 autograderUid=1001
@@ -65,6 +66,8 @@ class config():
 class Command(object):
     def __init__(self, cmd):
         self.cmd = cmd
+        self.cmdShort = cmd[0]
+        self.cmdSpaces = " ".join(cmd)
         self.process = None
 
         self.timeout = 1
@@ -75,11 +78,13 @@ class Command(object):
         self.didRun = False
         self.tooSlow = False
 
+
     def setProcessLimits(x):
         # This is called after fork and before exec. Any messages
         # printed here will look like the program that we are calling
         # printed them out.
 
+        #print("pre switch user")
         if switchUser:
             if os.geteuid() != 0:
                 print("We can't switch to a different user if this script is not run as root.")
@@ -96,35 +101,43 @@ class Command(object):
                 print("Halting. Do not run submitted programs as root.")
                 exit(1)
                 
-
+        #print("post switch user")
         
         #print("Preexec start")
         if os.setpgrp() == -1:  # put all processes in the same process group so we can kill it and all children it creates.
             print("Failed to set process group!")
-        nproc = int(os.environ["ULIMIT_NPROC"])
-        data  = int(os.environ["ULIMIT_DATA"])
-        fsize = int(os.environ["ULIMIT_FSIZE"])
         #print("Preexec middle")
-        resource.setrlimit(resource.RLIMIT_NPROC, (nproc,nproc));
-        resource.setrlimit(resource.RLIMIT_AS, (data,data));
-        resource.setrlimit(resource.RLIMIT_FSIZE, (fsize,fsize));
-        #print("Preexec end")
-        
+
+        def limitHelper(limitType, limit):
+            # limit is a string referring to a previously set environment variable.
+            if limit in os.environ:
+                limit = int(os.environ[limit])
+                (soft, hard) = resource.getrlimit(limitType)
+                #print("soft %d, hard %d, requested %d\n" % (soft, hard, limit))
+                if hard > 0 and limit > hard:
+                    limit = hard
+                resource.setrlimit(limitType, (limit, limit))
+
+        limitHelper(resource.RLIMIT_NPROC, "ULIMIT_NPROC")
+        limitHelper(resource.RLIMIT_AS, "ULIMIT_AS")
+        limitHelper(resource.RLIMIT_DATA, "ULIMIT_DATA")
+
 
     def run(self, autogradeobj, timeout=5, stdindata=None, workToDoWhileRunning=None):
         def target():
+            
             #print("target %s"%str(self.cmd));
             # To print current number of used processes, run: ps -eLF | grep $USER | wc -l
             os.environ["ULIMIT_NPROC"] = str(1024*4)            # Maximum number of processes
             os.environ["ULIMIT_DATA"]  = str(1024*1024*1024*8)  # 8 GB of memory
             os.environ["ULIMIT_FSIZE"] = str(1024*1024*1024*50) # 50 GB of space for files
 
-            limitString  = "Process manager: Limits are "
+            limitString  = "%s: Limits are " % self.cmdShort
             limitString += "time="  + str(timeout) + "sec "
             limitString += "memory=" + autogradeobj.humanSize(int(os.environ["ULIMIT_DATA"]))  + " "
             limitString += "fsize="  + autogradeobj.humanSize(int(os.environ["ULIMIT_FSIZE"])) + " "
 
-            msg='Process manager: Thread started: <b>'+str(self.cmd)+'</b><br>'
+            msg='%s: Thread started: <b>%s</b><br>' % (self.cmdShort, self.cmdSpaces)
             msg+=limitString
             autogradeobj.log_generic(msg, deductPoints=0, needSanitize=False);
             startTime = time.time()
@@ -156,13 +169,16 @@ class Command(object):
                     if autogradeobj.which(self.cmd[0]) == None:
                         raise OSError
 
-
+                my_env = os.environ.copy()
+                my_env["GCC_COLORS"] = ""
+                my_env["TERM"]="dumb"
+                    
                 if stdindata:
-                    self.process = subprocess.Popen(fixBuffering+self.cmd, stdin=subprocess.PIPE, stdout=stdoutFile[0], stderr=stderrFile[0], preexec_fn=self.setProcessLimits)
+                    self.process = subprocess.Popen(fixBuffering+self.cmd, stdin=subprocess.PIPE, stdout=stdoutFile[0], stderr=stderrFile[0], preexec_fn=self.setProcessLimits, env=my_env)
                     with autogradeobj.logLock:
                         autogradeobj.log("<tr>")
                         autogradeobj.log_lineNumber()
-                        autogradeobj.log("<td></td><td>Process manager: Data sent to stdin:")
+                        autogradeobj.log("<td></td><td>%s: Data sent to stdin:" % self.cmdShort)
                         autogradeobj.log_pre(str(stdindata))
                         autogradeobj.log("</td></tr>")
                     try:
@@ -173,7 +189,7 @@ class Command(object):
                         pass
                 else:
                     # No stdin provided.
-                    self.process = subprocess.Popen(fixBuffering+self.cmd, stdout=stdoutFile[0], stderr=stderrFile[0], preexec_fn=self.setProcessLimits)
+                    self.process = subprocess.Popen(fixBuffering+self.cmd, stdout=stdoutFile[0], stderr=stderrFile[0], preexec_fn=self.setProcessLimits, env=my_env)
 
                 #print("wait %s"%str(self.cmd));
                 self.process.wait()
@@ -195,15 +211,16 @@ class Command(object):
                 self.retcode = self.process.returncode
                 self.didRun = True
             except OSError as e:
-                autogradeobj.log_addEntry("Process manager: Unable to start process: " + str(e))
+                autogradeobj.log_addEntry("%s: Unable to start process: " % (self.cmdShort, self.cmdSpaces))
                 self.didRun = False
             elapsedTime = "%0.2fsec" % (time.time()-startTime)
             if self.retcode < 0:
-                autogradeobj.log_addEntry('Process manager: Process exited after ' + elapsedTime + ' due to signal ' + str(-self.retcode) + " " + autogradeobj.signal_to_string(-self.retcode))
+                autogradeobj.log_addEntry('%s: Exited after %s due to signal %d %s' % (self.cmdShort, elapsedTime, -self.retcode, autogradeobj.signal_to_string(-self.retcode)))
             else:
-                autogradeobj.log_addEntry('Process manager: Process exited after ' + elapsedTime + ' with return code ' + str(self.retcode))
+                autogradeobj.log_addEntry('%s: Exited after %s with return code %d' % (self.cmdShort, elapsedTime, self.retcode))
 
-
+        # END definition of target() function.
+        
         try:
             if switchUser and os.geteuid() == 0:
                 # If we are switching users, change ownership of files
@@ -226,7 +243,11 @@ class Command(object):
             
             thread.start()
             if workToDoWhileRunning:
-                # time.sleep(.2)  # give time for process to start.
+                # time.sleep(.2) # give time for process to start.
+                #
+                # IMPORTANT: If workToDoWhileRunning hangs, then our
+                # timeout mechanism won't work because we will not
+                # return from this function.
                 workToDoWhileRunning()
             #print("join before - %s"%str(self.cmd));
             thread.join(timeout)
@@ -239,7 +260,7 @@ class Command(object):
             # Check to see if we timed out
             self.tooSlow = False
             if thread.is_alive():
-                autogradeobj.log_addEntry("Process manager: Ran for more than %d seconds. Terminating process..." % timeout)
+                autogradeobj.log_addEntry("%s: Ran for more than %d seconds. Terminating process..." % (self.cmdShort, timeout))
                 self.tooSlow = True
 
                 # Try to politely kill the process
@@ -248,11 +269,12 @@ class Command(object):
                         #print("killpg 1 - %s"%str(self.cmd));
                         os.killpg(self.process.pid, signal.SIGINT) # send Ctrl+C to process group
                         # self.process.send_signal(signal.SIGINT)    # send Ctrl+C to the parent process
-                        time.sleep(1)  # give process a chance to cleanup (for example valgrind printing its final summary)
+                        time.sleep(.3)  # give process a chance to cleanup (for example valgrind printing its final summary)
                         #print("killpg 2 - %s"%str(self.cmd));
                         os.killpg(self.process.pid, signal.SIGKILL) # kill the process group
                     except ProcessLookupError:
-                        print("ProcessLookupError - %s"%str(self.cmd));
+                        # print("ProcessLookupError - %s"%str(self.cmd));
+                        #
                         # ProcessLookupError occurs if the PID is
                         # already killed. This seems to happen
                         # sometimes when we try to write to
@@ -265,7 +287,7 @@ class Command(object):
             # In the unlikely event the thread is still alive, exit so
             # we know something went wrong.
             if thread.is_alive():
-                print("Process manager: We failed to kill thread. Exiting.")
+                print("%s: We failed to kill thread. Exiting." % self.cmdShort)
                 exit(1)
 
             
@@ -284,21 +306,6 @@ class autograder():
     def __init__(self, username, totalPoints=100):
         self.lineNumber = 0
         self.logPointsTotal = totalPoints
-
-        # Find any old /tmp/ag-*-working-* folders or any old
-        # /tmp/ag-*-report- files and delete them.
-        #
-        # Causes problems if multiple autograders are running on same machine.
-        # for f in glob.glob("/tmp/ag-*-*-*"):
-        #     try:
-        #         if os.path.isfile(f):
-        #             print("Deleting old temporary file:      %s"% f);
-        #             os.unlink(f)
-        #         else:
-        #             print("Deleting old temporary directory: %s"% f);
-        #             shutil.rmtree(f, ignore_errors=True)
-        #     except PermissionError:
-        #         print("Failed to remove %s due to permission error"%f)
                 
                 
         # The temporary location of the autograder report file. It
@@ -381,6 +388,10 @@ class autograder():
                 self.log_addEntry("You submitted a file named '%s'" % cs['attachments'][0]['filename'])
             if 'attachments' in cs and cs['attachments'][0] and 'display_name' in cs['attachments'][0]:
                 self.log_addEntry("Canvas calls your submitted file '%s'" % cs['attachments'][0]['display_name'])
+            if 'attachments' in cs and cs['attachments'] and 'late' in cs['attachments']:
+                if cs['attachments']['late'] == True:
+                    self.log_addEntry("LATE: This submission was turned in late.")
+                    
         if 'md5sum' in metadata:
             self.log_addEntry("Submitted file had md5sum " + metadata['md5sum'])
 
@@ -396,6 +407,7 @@ class autograder():
 
         import platform
         self.log_addEntry("Autograder is running on: %s" % platform.platform())
+
         self.log_addEntry("You initially have "+str(self.logPointsTotal)+" points; autograder will deduct points below; total at bottom.")
 
         self.log_addEntry("=== Begin autograding")
@@ -435,11 +447,14 @@ class autograder():
         
         # Since we don't actually use negative scores in grading and since students don't like to see them, we make them less noticeable.
         if origScore < 0:
-            self.log_addEntry("Your score was adjusted from %d to %d. The adjustment was applied because we don't give negative scores to students." % (origScore, self.logPointsTotal))
+            self.log_addEntry("ADJUSTMENT: Your score was adjusted from %d to %d. We don't give negative scores." % (origScore, self.logPointsTotal))
 
-        self.log_addEntry("IMPORTANT: If this report is sent prior to the assignment deadline, remember that the autograder tests and scoring may change significantly. If this report is sent after the assignment deadline, remember that the instructor or TA will use this report to assist with grading---and your actual grade may differ from what this report says.")
-        self.log_addEntry("HAVE INFO THAT MIGHT HELP THE HUMAN GRADER? If you have any information that the instructor or TA should know about when grading your submission, please leave a comment on your submission in Canvas. Go to the assignment or submission page and look for a link named 'Submission details'.")
-        self.log_addEntry("FOUND A BUG IN THE AUTOGRADER? Email your instructor.")
+        if self.logPointsTotal == 0:
+            self.log_addEntry("ZERO: Although the autograder gave you a zero, if you have made some progress toward completing the assignment, you will likely get higher score from the human grader.")
+
+        self.log_addEntry("Reports sent PRIOR to the deadline are for your information only. Autograder tests may change either before or after the deadline.")
+        self.log_addEntry("Reports sent AFTER the deadline will be used by the grader/TA/instructor to assist with grading. Your actual grade may differ from what this report says.")
+        self.log_addEntry("Want to talk to the grader? If you have any information that the instructor or TA should know about when grading your submission, please leave a comment on your submission in Canvas. Go to the assignment or submission page and look for a link named 'Submission details'. If you have an urgent question or find an autograder bug, email your instructor.")
 
         self.log("</table></body></html>")
         
@@ -473,7 +488,8 @@ class autograder():
             
         # Make metadata file be readable by the main user (not the temporary one we use to run submissions with).
         if switchUser and os.geteuid() == 0:
-            os.chown(metadataFile, normalUid, -1);
+            os.chown(metadataFile, normalUid, normalGid);
+            os.chown(logFileDest, normalUid, normalGid);
 
             
     def skip(self):
@@ -571,7 +587,7 @@ class autograder():
         if not os.path.exists(filename):
             return "Can't read from " + filename + " because it doesn't exist."
 
-        with open(filename, 'r', encoding="ascii", errors='replace') as f:
+        with open(filename, 'r', encoding="utf-8", errors='replace') as f:
             if os.path.getsize(filename) > 10000:
                 retstring = f.read(4000)
                 retstring += "\n\nSNIP SNIP SNIP (leaving out some of the output!)\n\n"
@@ -580,6 +596,7 @@ class autograder():
                 retstring += f.read(4000)
             else:
                 retstring = f.read()
+
         return retstring
 
 
@@ -678,7 +695,7 @@ class autograder():
             self.log_addEntry("Unexpected directory: " + str(f), deductPoints)
 
     def log_pre(self, msg):
-        """Prints a preformatted message to the autogarder log."""
+        """Prints a preformatted message to the autogarder log. Call log_addEntryRaw() if you wish to print a full line (line number, score, in table) with preformatting."""
         self.log("<div class='preformatcode'><pre>%s</pre></div>" % self.sanitize_string(msg))
 
             
@@ -694,10 +711,12 @@ class autograder():
         with open(self.logFile, "a") as myfile:
             myfile.write(msg +'\n')
 
-    def log_generic(self, msg, deductPoints=0, needSanitize=1):
+    def log_generic(self, msg, deductPoints=0, needSanitize=1, raw=0):
+        if not msg:
+            return
 
         with self.logLock:
-            if needSanitize:
+            if needSanitize and raw==0:
                 msg = self.sanitize_string(msg)
 
             if msg.startswith('==='):
@@ -717,15 +736,26 @@ class autograder():
             if deductPoints != 0:
                 scoreString = "%s" % str(deductPoints)
                 self.logPointsTotal = self.logPointsTotal + deductPoints
+                # Print point deductions to console too.
+                print("%d - %s" % (deductPoints, msg))
 
             self.log("<tr>")
             self.log_lineNumber()
-            self.log("<td>%s</td><td>%s</td></tr>" % (scoreString, msg))
+            if raw:
+                self.log("<td>%s</td><td>" % scoreString)
+                self.log_pre(msg)
+                self.log("</td></tr>")
+            else:
+                self.log("<td>%s</td><td>%s</td></tr>" % (scoreString, msg))
         
             
     def log_addEntry(self, msg, deductPoints=0):
         """Appends a entry into a log file. If pointsDeducted is set, points will be removed from the students grade and mentioned in the log file."""
         self.log_generic(msg, deductPoints=deductPoints, needSanitize=True)
+
+    def log_addEntryRaw(self, msg, deductPoints=0):
+        self.log_generic(msg, deductPoints=deductPoints, needSanitize=False, raw=1)
+    
         
 
     def log_file_contents(self, filename):
@@ -754,20 +784,35 @@ class autograder():
             if not quiet:
                 self.log_addEntry("Deleted: " + filename + " " + filesize)
 
-    def asciistring(self, input):
-        """Removes non-printable characters (including Unicode!) from the string."""
-        newstr = ''.join(filter(lambda x: x in string.printable, input))
-        # Just remove carriage returns. Windows uses \r\n for newlines
-        return newstr.replace('\r', '');
+    def sanitize_string(self, instring, escape=True):
+        """Show odd characters in hex. Performs HTML escaping"""
+        if escape:
+            instring = cgi.escape(instring)
 
-    def sanitize_string(self, input):
-        """Removes non-ASCII characters from string, and performs HTML escaping"""
-        out = self.asciistring(input)
+        out=""
+        for i in instring:
+            if i == '‘':    #smart quote
+                out += '‘'
+            elif i == '’':  #smart quote
+                out += '’'
+            elif i == '\r':
+                # Strip, should be followed with \n
+                # Don't want to show two newline characters for lines with \r\n line endings.
+                continue
+            elif i == '\n':
+                out += "&crarr;\n"
+            #elif i == '\t':       # tab to right-arrow
+            #    out += "&rarr;"   # messes up formatting too much.
+            elif i in string.printable:
+                # copy printable strings (digits, letters, punctuation, whitespace)
+                out += i
+            else:  # nonprintable ASCII.
+                out += "\\{0x%02x}" % ord(i)  # print value in hex so it looks like: \{0x02} 
+        
         # We could strip whitespace, but we don't want to strip
         # whitespace from the strings that we are saying that we are
         # searching for.
-        out = cgi.escape(out)
-        out = out.replace("\n", "&crarr;\n")
+
         return out
 
     def run(self, exe, timeout=5, stdindata=None, deductTimeout=0, deductSegfault=0, quiet=False, workToDoWhileRunning=None):
@@ -778,34 +823,42 @@ class autograder():
             return (didRun, tooSlow, retcode, stdoutdata, stderrdata)
 
         if not didRun:
-            self.log_addEntry("Command " + str(exe) + " didn't run (missing exe?).")
+            self.log_addEntry("%s: Command didn't run (missing exe?): %s" % (cmd.cmdShort, cmd.cmdSpaces))
             return (didRun, tooSlow, retcode, stdoutdata, stderrdata)
 
-        if tooSlow:
-            self.log_addEntry("Command " + str(exe) + " didn't finish within " + str(timeout) + " seconds. (infinite loop?).", deductTimeout)
+        # It should be mentioned earlier that the process had to be
+        # killed with Ctrl+C. Only repeat the information if we are
+        # deducting points because of it.
+        if tooSlow and deductTimeout != 0:
+            self.log_addEntry("%s: Command didn't finish within %d seconds (infinite loop?): %s" % (cmd.cmdShort, timeout, cmd.cmdSpaces), deductTimeout)
 
         # if retcode is negative, it contains the signal that
         # terminated the process. If positive, it is the process exit
         # value.
-        if not tooSlow and retcode < 0:
-            self.log_addEntry("Exit status: Program exited due to a signal (segfault?)", deductSegfault);
+        #
+        # Details about the signal causing the program to exit should
+        # already be printed. Here, only print another line about it
+        # if we are deducting points because of the segfault/exit due
+        # to signal.
+        if not tooSlow and retcode < 0 and deductSegfault != 0:
+            self.log_addEntry("%s: Program exited due to a signal (segfault?)" % cmd.cmdShort, deductSegfault);
 
         if len(stdoutdata) == 0 and len(stderrdata) == 0:
-            self.log_addEntry("Program output: stdout and stderr were empty.")
+            self.log_addEntry("%s: stdout and stderr were empty." % cmd.cmdShort)
         elif len(stdoutdata) > 0 and len(stderrdata) > 0:
-            msg = "Program output: stdout:"
+            msg = "%s: stdout:" % cmd.cmdShort
             msg += "<div class='preformatcode'><pre>%s</pre></div>" % self.sanitize_string(stdoutdata)
             self.log_generic(msg, deductPoints=0, needSanitize=False)
-            msg = "Program output: stderr:"
+            msg = "%s: stderr:" % cmd.cmdShort
             msg += "<div class='preformatcode'><pre>%s</pre></div>" % self.sanitize_string(stderrdata)
             self.log_generic(msg, deductPoints=0, needSanitize=False)
 
         elif len(stdoutdata) == 0 and len(stderrdata) > 0:
-            msg = "Program output: stdout was empty, stderr was:"
+            msg = "%s: stdout was empty, stderr was:" % cmd.cmdShort
             msg += "<div class='preformatcode'><pre>%s</pre></div>" % self.sanitize_string(stderrdata)
             self.log_generic(msg, deductPoints=0, needSanitize=False)
         else:
-            msg = "Program output: stderr was empty, stdout was:"
+            msg = "%s: stderr was empty, stdout was:" % cmd.cmdShort
             msg += "<div class='preformatcode'><pre>%s</pre></div>" % self.sanitize_string(stdoutdata)
             self.log_generic(msg, deductPoints=0, needSanitize=False)
 
@@ -817,25 +870,29 @@ class autograder():
         """Acts the same as run() but also deducts points if return code doesn't match expectRetExitCode."""
         (didRun, tooSlow, retcode, stdoutdata, stderrdata) = self.run(exe, stdindata=stdindata, deductTimeout=deductTimeout, deductSegfault=deductSegfault, timeout=timeout, quiet=quiet, workToDoWhileRunning=workToDoWhileRunning)
         # Don't deduct points for wrong exit code if we are already deducting points for segfault.
-        if retcode < 0 and deductSegfault != 0:
-            self.log_addEntry("Exit status: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit.")
+        if retcode < 0 and deductSegfault != 0 and deductWrongExit != 0:
+            self.log_addEntry("%s: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit." % exe[0])
             deductWrongExit = 0;
+            
         if retcode != expectExitCode:
-            self.log_addEntry("Exit status: Expecting exit code " + str(expectExitCode) + " but found " + str(retcode), deductWrongExit)
+            self.log_addEntry("%s: Expecting exit code %d but found %d" %
+                              (exe[0], expectExitCode, retcode), deductWrongExit)
         else:
-            self.log_addEntry("Exit status: Program exited as expected (with exit code " + str(expectExitCode) + ")")
+            self.log_addEntry("%s: Program exited as expected (with exit code %d)" %
+                              (exe[0],expectExitCode))
+            
         return (didRun, tooSlow, retcode, stdoutdata, stderrdata)
 
     def run_expectNotExitCode(self, exe, expectNotExitCode = 0, timeout=1, stdindata=None, deductTimeout=0, deductSegfault=0, deductWrongExit=0):
         """Acts the same as run() but also deducts points if return code matches expectNotExitCode. If you are running a program that should produce a non-zero exit code, set expectNotExitCode=0."""
         (didRun, tooSlow, retcode, stdoutdata, stderrdata) = self.run(exe, timeout, stdindata, deductTimeout, deductSegfault)
-        if retcode < 0 and deductSegfault != 0:
-            self.log_addEntry("Exit status: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit.")
+        if retcode < 0 and deductSegfault != 0 and deductWrongExit != 0:
+            self.log_addEntry("%s: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit." % exe[0])
             deductWrongExit = 0;
         if retcode == expectNotExitCode:
-            self.log_addEntry("Exit status: Expecting an exit code that is not " + str(expectNotExitCode) + " but found " + str(retcode), deductWrongExit)
+            self.log_addEntry("%s: Expecting an exit code that is not %d but found %d" % (exe[0], expectNotExitCode, retcode), deductWrongExit)
         else:
-            self.log_addEntry("Exit status: Program exited as we expected (with any exit code except " + str(expectNotExitCode) + ")")
+            self.log_addEntry("%s: Program exited as we expected (with any exit code except %d)" % (exe[0], expectNotExitCode))
         return (didRun, tooSlow, retcode, stdoutdata, stderrdata)
 
 

@@ -482,6 +482,13 @@ class canvas():
         else:
             return "%s (%s)" % (localstring, humanstring)
 
+    @classmethod
+    def humanSize(self, num):
+        for x in ['bytes','KiB','MiB','GiB','TiB']:
+            if num < 1024.0:
+                return "%d %s" % (round(num), x)
+            num /= 1024.0
+
 
     def downloadSubmission(self, submission, student, directory, group_memberships={}):
         """Downloads a specific submission from a student into a directory."""
@@ -582,7 +589,9 @@ class canvas():
         print("%-12s downloading attempt %d submitted %s (replacing attempt %d)" % (login, newAttempt, 
               self.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)), cachedAttempt))
         try:
-            urllib.request.urlretrieve(attachment['url'], directory+"/"+login+exten)
+            downloadFileName=directory+"/"+login+exten
+            urllib.request.urlretrieve(attachment['url'], downloadFileName)
+            print("%-12s submission size was %s" % (login, self.humanSize(os.stat(downloadFileName).st_size)))
         except:
             print("ERROR: Failed to download "+attachment['url'])
             import traceback
@@ -627,8 +636,8 @@ class canvas():
             if not f.endswith(".AUTOGRADE.json"):
                 self.extractFile(dir+"/"+f, dir, newSubdir)
 
-    def removeELFs(self, subdirName):
-        """Remove ELF files anywhere in the subdirectory."""
+    def removeExecutables(self, subdirName):
+        """Remove executable/ELF/EXE files anywhere in the subdirectory."""
         for dirpath, dnames, fnames in os.walk(subdirName):
             for f in fnames:            # for each file in tree
                 fullpath = os.path.join(dirpath, f)
@@ -646,8 +655,11 @@ class canvas():
                         if len(magic) >= 4 and magic[0] == 0xce and magic[1] == 0xfa and magic[2]==0xed and magic[3]==0xfe:
                                 print(fullpath + " is Mach-O executable, removing")
                                 os.unlink(fullpath)
-                                
+                        if len(magic) >= 2 and magic[0] == 0x4d and magic[1] == 0x5a:
+                                print(fullpath + " is Windows executable, removing")
+                                os.unlink(fullpath)
 
+                                
     def removeDSStore(self, subdirName):
         """Remove unnecessary Apple-related files anywhere in the subdirectory."""
         for dirpath, dnames, fnames in os.walk(subdirName):
@@ -675,7 +687,6 @@ class canvas():
                         os.unlink(fullpath)
 
 
-                    
     def removeBackupFiles(self, subdirName):
         """Remove unnecessary text-editor backup files anywhere in the subdirectory."""
         for dirpath, dnames, fnames in os.walk(subdirName):
@@ -686,6 +697,23 @@ class canvas():
                        f.endswith("~"):
                         print(fullpath + " is a text-editor backup file, removing")
                         os.unlink(fullpath)
+
+    def removeVisualStudio(self, subdirName):
+        """Remove unnecessary visual studio files found anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for d in dnames:
+                fullpath = os.path.join(dirpath, d)
+                if os.path.isdir(fullpath):
+                    if d == ".vs" or d == "Debug":
+                        print(fullpath + " is a Visual Studio directory, removing")
+                        shutil.rmtree(fullpath)
+            for f in fnames:
+                fullpath = os.path.join(dirpath, f)
+                if os.path.isfile(fullpath):
+                    if f.endswith(".ilk") or f.endswith(".pdb") or f.endswith(".lib"):
+                        print(fullpath + " is a Visual Studio file, removing")
+                        os.unlink(fullpath)
+
 
     def removeGit(self, subdirName):
         """Remove unnecessary git repos found anywhere in the subdirectory."""
@@ -797,7 +825,8 @@ class canvas():
         else: # If we did extract files into a subdirectory
             # Remove files we don't need or want.
             self.removeSymLinks(destDir)
-            self.removeELFs(destDir)
+            self.removeExecutables(destDir)
+            self.removeVisualStudio(destDir)
             self.removeDSStore(destDir)
             self.removeBackupFiles(destDir)
             self.removeGit(destDir)

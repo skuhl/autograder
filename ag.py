@@ -123,7 +123,7 @@ def emailSent(dirs):
                             
 def stats(dirs):
     score_list=[]
-    print("%-12s %5s %9s %9s %14s %5s %5s %5s %5s" % ("name", "agPts", "agPtsOrig", "canvasPts", "SubmitTime", "atmpt", "late", "lock", "email"))
+    print("%-12s %5s %9s %9s %5s %4s %4s %5s %s" % ("name", "agPts", "agPtsOrig", "canvasPts", "atmpt", "late", "lock", "email", "SubmitTime"))
     for d in dirs:
         metadataFile = d + "/AUTOGRADE.json"
         metadata = {}
@@ -134,7 +134,7 @@ def stats(dirs):
         if metadata.get('emailSent', 0):
             emailed="X"
         else:
-            emailed=""
+            emailed="-"
 
         score="  ---"
         if 'autograderScore' in metadata and os.path.exists(os.path.join(d, "AUTOGRADE.html")):
@@ -161,8 +161,8 @@ def stats(dirs):
 
         attempt=0
         timeString=''
-        late=''
-        locked=''
+        late='-'
+        locked='-'
         if 'canvasSubmission' in metadata:
             attempt = metadata['canvasSubmission'].get('attempt', "0")
             if metadata['canvasSubmission']['late']:
@@ -177,9 +177,9 @@ def stats(dirs):
                 utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
                 timeString = canvas.canvas.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))
 
-        print("%-12s %5s %9s %9s %14s %5d %5s %5s %5s" % (d, score, scoreOrig, canvasScore, timeString, attempt, late, locked, emailed))
+        print("%-12s %5s %9s %9s %5d %4s %4s %5s %s" % (d, score, scoreOrig, canvasScore, attempt, late, locked, emailed, timeString))
 
-    print("Submission count: %d" % len(dirs))
+    print("Submissions shown: %d" % len(dirs))
 
     average = "?"
     media = "?"
@@ -195,6 +195,14 @@ def stats(dirs):
         print("Low/average/median/high score: %d/%s/%s/%d" % (min(score_list),
                                                               average, median,
                                                               max(score_list)))
+        try:
+            print("The most common score is %d. " % statistics.mode(score_list))
+        except statistics.StatisticsError:
+            print("There is more than 1 most common score. ")
+            # If there is more than one mode, this exception occurs.
+            pass
+
+        
 emailSession = None
 
 
@@ -288,23 +296,30 @@ def emailSend(dirs):
         senderEmail = emailFrom + '@' + domainName
     emailLogin(senderEmail, emailPassword)
 
-    message = "Your autograder report is attached. "
-    allScores = getAllScores()
-    totalAttempts = getSumOfAttempts()
-    if len(allScores) == 1:
-        message += "Congratulations. You are the first and only student to have submitted something. "
-    elif len(allScores) > 1:
-        message += "%d students have made %d submissions for this assignment (an average of about %d submissions per student). " % (len(allScores), totalAttempts, int(round(totalAttempts/len(allScores))))
+    message = "Your autograder report is attached.\n\n"
 
+    # count number of dirs. The 'dirs' parameter passed into this
+    # function is just the directories we are supposed to send emails
+    # to.
+    allDirs = [name for name in os.listdir(".") if os.path.isdir(name)]
+    message += "Students with submissions: %d\n" % len(allDirs)
+    allScores = getAllScores()
+    message += "Students with autograder scores: %d\n" % len(allScores)
+    totalAttempts = getSumOfAttempts()
+    message += "Total number of submissions (students can submit multiple times): %d\n" % totalAttempts
+    
     if len(allScores) > 5:
-        message += "The average score is %d. " % int(round(statistics.mean(allScores)))
-        message += "The median score is %d. " % int(round(statistics.median(allScores)))
         try:
-            message += "The most common score is %d. " % statistics.mode(allScores)
+            message += "Most common score (i.e., mode): %d\n" % statistics.mode(allScores)
         except statistics.StatisticsError:
             # If there is more than one mode, this exception occurs.
             pass
-        message += "The scores range from %d to %d. " % (allScores[0], allScores[-1])
+        message += "Highest score: %d\n" % allScores[-1]
+        message += "Average score: %d\n" % int(round(statistics.mean(allScores)))
+        message += "Median score: %d\n" % int(round(statistics.median(allScores)))
+        message += "Lowest score: %d\n" % allScores[0]
+    else:
+        message += "Stats on scores are not provided until more students submit and more submissions are autograded.\n"
 
     # send email messages
     for thisDir in dirs:
@@ -315,10 +330,10 @@ def emailSend(dirs):
             with open(metadataFile, "r") as f:
                 metadata = json.load(f)
         if metadata.get('emailSent', 0):
-            print("%-12s SKIPPING - Already emailed most recent report." % thisDir)
+            print("%-12s Skip (Already sent newest report)." % thisDir)
             continue;
-        if not os.path.exists(agFilename):
-            print("%-12s SKIPPING - AUTOGRADE.html is missing." % thisDir)
+        if not os.path.exists(agFilename) or not os.path.exists(metadataFile):
+            print("%-12s Skip (AUTOGRADE.html is missing)." % thisDir)
             continue;
 
         # Start by assuming directory name is the username
@@ -333,15 +348,17 @@ def emailSend(dirs):
         if group:
             # Email every student in the group
             for student in group:
-                print("%-12s Sending message to group member %s" % (thisDir, student['login_id']))
+                print("%-12s Sending (to group member %s)" % (thisDir, student['login_id']))
                 with open(agFilename, 'r') as content_file:
                     attachment = content_file.read()
                     emailStudent(senderEmail, student['login_id'], emailSubject, attachment, message)
         else:
-            print("%-12s Sending message to %s" % (thisDir, emailToAddr))
+            print("%-12s Sending" % (thisDir))
             with open(agFilename, 'r') as content_file:
+                if 'autograderScore' in metadata:
+                    message_with_grade = message + "\nYour score: %d\n" % metadata['autograderScore']
                 content = content_file.read()
-                emailStudent(senderEmail, emailToAddr, emailSubject, content, message)
+                emailStudent(senderEmail, emailToAddr, emailSubject, content, message_with_grade)
 
         metadata['emailSubject'] = emailSubject
         metadata['emailCtime'] = str(datetime.datetime.now().ctime())
@@ -417,8 +434,8 @@ elif sys.argv[1] == 'downloadlate':
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, acceptLate=True)
     if len(sys.argv) == 3:
         # Delete the any existing submission with the given name
-        if os.path.exists(os.path.join(subdirName, sys.argv[2])):
-            shutil.rmtree(os.path.join(subdirName, sys.argv[2]))
+        #if os.path.exists(os.path.join(subdirName, sys.argv[2])):
+        #    shutil.rmtree(os.path.join(subdirName, sys.argv[2]))
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, userid=sys.argv[2], acceptLate=True)
     else:
         print("Usage:")
@@ -445,10 +462,15 @@ elif sys.argv[1] == 'emailsent':
 elif sys.argv[1] == 'view':
     if len(sys.argv) == 3:
         path = os.path.join(subdirName, sys.argv[2], "AUTOGRADE.html")
-        print("viewing: %s"%path)
-        os.system('links -codepage utf-8 -dump -width %d %s | less' %
-                  (shutil.get_terminal_size((80,20)).columns,
-                   path))
+        if os.path.exists(path):
+            print("Viewing: %s"%path)
+            os.system('links -codepage utf-8 %s' % path)
+        else:
+            print("Can't view file: %s"%path)
+        
+#        os.system('links -codepage utf-8 -dump -width %d %s | less -iFXRM' %
+#                  (shutil.get_terminal_size((80,20)).columns,
+#                   path))
     else:
         print("Usage:")
         print(" ag.py view username")
@@ -457,8 +479,11 @@ elif sys.argv[1] == 'view':
 elif sys.argv[1] == 'viewgui':
     if len(sys.argv) == 3:
         path = os.path.join(subdirName, sys.argv[2], "AUTOGRADE.html")
-        print("viewing: %s"%path)
-        os.execvp('xdg-open', ['xdg-open',path])
+        if os.path.exists(path):
+            print("Viewing: %s"%path)
+            os.execvp('xdg-open', ['xdg-open',path])
+        else:
+            print("Can't view file: %s"%path)
     else:
         print("Usage:")
         print(" ag.py viewgui username")

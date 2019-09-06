@@ -126,6 +126,17 @@ class canvas():
         #self.prettyPrint(allCourses)
         return allCourses
 
+    def getTeachersAndGraders(self, courseId=None):
+        # Get a listing of students (include student name, id, username, etc).
+        teachers =  self.makeRequest("courses/"+str(courseId)+"/users?enrollment_type[]=teacher&"+
+                                     urllib.parse.urlencode({"per_page":"100",
+                                                             "page": "1"}))
+        tas =  self.makeRequest("courses/"+str(courseId)+"/users?enrollment_type[]=ta&"+
+                                     urllib.parse.urlencode({"per_page":"100",
+                                                             "page": "1"}))
+        return teachers+tas
+        
+
     def getStudents(self, courseId=None):
         """Gets list of students in a course."""
         courseId = courseId or self.courseId

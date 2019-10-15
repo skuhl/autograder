@@ -136,6 +136,17 @@ class canvas():
         #self.prettyPrint(validCourses)
         return validCourses
 
+    def getTeachersAndGraders(self, courseId=None):
+        # Get a listing of students (include student name, id, username, etc).
+        teachers =  self.makeRequest("courses/"+str(courseId)+"/users?enrollment_type[]=teacher&"+
+                                     urllib.parse.urlencode({"per_page":"100",
+                                                             "page": "1"}))
+        tas =  self.makeRequest("courses/"+str(courseId)+"/users?enrollment_type[]=ta&"+
+                                     urllib.parse.urlencode({"per_page":"100",
+                                                             "page": "1"}))
+        return teachers+tas
+        
+
     def getStudents(self, courseId=None):
         """Gets list of students in a course."""
         courseId = courseId or self.courseId
@@ -673,6 +684,20 @@ class canvas():
                                 print(fullpath + " is Windows executable, removing")
                                 os.unlink(fullpath)
 
+    def fixShellScriptPerms(self, subdirName):
+        """Finds files that look like shell scripts, makes them executable. Zip files lose permission bits"""
+        for dirpath, dnames, fnames in os.walk(subdirName):
+            for f in fnames:            # for each file in tree
+                fullpath = os.path.join(dirpath, f)
+                if os.path.isfile(fullpath):   # check that it is a file
+                    with open(fullpath, "rb") as fileBytes:  # open the file
+                        magic = fileBytes.read(3)
+                        #print(fullpath + " " + str(magic))
+                        if magic == b'#!/':
+                            print(fullpath + " is apparently a shell script. Making executable.")
+                            currentPerm = os.stat(fullpath).st_mode
+                            os.chmod(fullpath, currentPerm | stat.S_IXUSR)
+                                
                                 
     def removeDSStore(self, subdirName):
         """Remove unnecessary Apple-related files anywhere in the subdirectory."""
@@ -688,6 +713,11 @@ class canvas():
             for d in dnames:
                 fullpath = os.path.join(dirpath, d)
                 if os.path.isdir(fullpath) and d == "__MACOSX":
+                    print(fullpath + " is a Apple related folder, removing")
+                    shutil.rmtree(fullpath)
+            for d in dnames:
+                fullpath = os.path.join(dirpath, d)
+                if os.path.isdir(fullpath) and d.endswith(".dSYM"):
                     print(fullpath + " is a Apple related folder, removing")
                     shutil.rmtree(fullpath)
 
@@ -760,7 +790,16 @@ class canvas():
                             print(fullpath + " is a "+e+" file, removing")
                             os.unlink(fullpath)
 
-
+    def removeEmptyDirs(self, subdirName):
+        """Remove empty folders anywhere in the subdirectory."""
+        for dirpath, dnames, fnames in os.walk(subdirName, topdown=False):
+            for d in dnames:
+                try:
+                    fullpath = os.path.join(dirpath, d)
+                    os.rmdir(os.path.join(dirpath, d))
+                    print(fullpath + " is an empty folder; removed.");
+                except OSError:
+                    pass
                 
     def extractFile(self, filename, dir, newSubdir=False):
         """Extracts filename into dir. If newSubdir is set, create an additional subdirectory inside of dir to extract the files into."""
@@ -851,6 +890,9 @@ class canvas():
             self.removeGit(destDir)
             self.removeAutograder(destDir)
             self.removeEndings(destDir, [".zip", ".tgz", ".tar", ".tar.gz", ".a"])
+            self.fixShellScriptPerms(destDir)
+            # Do this last since deleting files above can create empty dirs:
+            self.removeEmptyDirs(destDir)
             
             # Remove unnecessary subdirectories
             while True:

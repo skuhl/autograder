@@ -642,6 +642,10 @@ class canvas():
     def extractAllFiles(self, dir=".", newSubdir=False):
         print("Extracting all files into: " + dir)
         files = self.get_immediate_files(dir)
+        # Here, we assume all files in the destination directory can
+        # potentially be extracted. Usually, each file will be a zip
+        # or tgz file from each student (with a corresponding
+        # .AUTOGRADE.json) next to it.
         for f in files:
             if not f.endswith(".AUTOGRADE.json"):
                 self.extractFile(dir+"/"+f, dir, newSubdir)
@@ -760,12 +764,18 @@ class canvas():
                 
     def extractFile(self, filename, dir, newSubdir=False):
         """Extracts filename into dir. If newSubdir is set, create an additional subdirectory inside of dir to extract the files into."""
+
+        if os.path.basename(filename).startswith("."):
+            print("Assuming hidden file isn't a student submission: %s" % filename)
+            return
+        
         import tarfile,zipfile
         destDir = dir
         if newSubdir:
             # If using newSubdir, make a directory with the same
             # name as the file but without the extension.
             destDir = os.path.splitext(filename)[0]
+
 
         # Calculate md5sum
         md5sum = ""
@@ -777,7 +787,6 @@ class canvas():
                     break
                 m.update(data)
             md5sum = m.hexdigest()
-
 
         if os.path.exists(destDir):
             shutil.rmtree(destDir)

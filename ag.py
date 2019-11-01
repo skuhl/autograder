@@ -432,7 +432,7 @@ elif sys.argv[1] == 'downloadlate':
     c = canvas.canvas()
     if len(sys.argv) == 2:
         c.downloadAssignment(courseName=courseName, assignmentName=assignmentName, subdirName=subdirName, acceptLate=True)
-    if len(sys.argv) == 3:
+    elif len(sys.argv) == 3:
         # Delete the any existing submission with the given name
         #if os.path.exists(os.path.join(subdirName, sys.argv[2])):
         #    shutil.rmtree(os.path.join(subdirName, sys.argv[2]))

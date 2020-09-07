@@ -10,6 +10,7 @@ import time,datetime
 import json
 import tempfile
 import cgi
+import html
 import resource
 import re
 
@@ -86,12 +87,7 @@ class Command(object):
 
         #print("pre switch user")
         if switchUser:
-            if os.geteuid() != 0:
-                print("We can't switch to a different user if this script is not run as root.")
-                exit(1)
-            # If we are supposed to switch to a different user account to do the grading
-            if os.geteuid() == 0:
-                os.setreuid(autograderUid,autograderUid)
+            os.setreuid(autograderUid,autograderUid)
             if os.geteuid() == 0:
                 print("Still root after trying to switch to autograder user?")
                 exit(1)
@@ -222,11 +218,15 @@ class Command(object):
         # END definition of target() function.
         
         try:
-            if switchUser and os.geteuid() == 0:
-                # If we are switching users, change ownership of files
-                os.chown(autogradeobj.logFile, autograderUid, -1);
-                autogradeobj.chownDir(autogradeobj.workingDirectory, autograderUid, -1);
+            if switchUser==False and os.geteuid() == 0:
+                print("Don't set switchUser==False and grade student submissions as root since student submissions would be run as root.")
+                exit(1)
 
+            if switchUser==True and os.geteuid() != 0:
+                print("If switchUser==True, you should run this as root.")
+                exit(1)
+            
+            if switchUser==True and os.geteuid() == 0:
                 # Don't kill processes if the user is intentionally running multiple processes via workToDoWhileRunning() function
                 if threading.activeCount() == 1:
                     import pwd
@@ -287,7 +287,7 @@ class Command(object):
             # In the unlikely event the thread is still alive, exit so
             # we know something went wrong.
             if thread.is_alive():
-                print("%s: We failed to kill thread. Exiting." % self.cmdShort)
+                print("%s: We failed to kill thread after timeout was reached. Exiting." % self.cmdShort)
                 exit(1)
 
             
@@ -311,10 +311,11 @@ class autograder():
         # The temporary location of the autograder report file. It
         # will be moved to the student submission directory when the
         # autograder is complete (i.e., cleanup() is called).
-        logfiletmp = tempfile.mkstemp(prefix="ag-"+username+"-report-")
-        # We don't use the file descriptor that mkstemp creates, just the filename.        
-        os.close(logfiletmp[0])
-        self.logFile = logfiletmp[1]
+        tempdir = tempfile.mkdtemp(prefix="autograder-"+username+"-")
+        if switchUser:
+            os.chown(tempdir, autograderUid, 0)
+            os.chmod(tempdir, 0o770)
+        self.logFile = os.path.join(tempdir, "report.html")
         # Prevent multiple threads from writing to log file at same time.
         self.logLock = threading.Lock()
         
@@ -326,8 +327,11 @@ class autograder():
         self.directory = os.path.join(self.origwd, username)
 
         # The autograder will do its work in a working directory
-        self.workingDirectory = tempfile.mkdtemp(prefix="ag-"+username+"-working-")
-
+        self.workingDirectory = os.path.join(tempdir, "working")
+        os.mkdir(self.workingDirectory)
+        if switchUser:
+            os.chown(self.workingDirectory, autograderUid, 0)
+            os.chmod(self.workingDirectory, 0o770)
         self.username = username
 
         # Copy the student's submission into the working
@@ -464,6 +468,8 @@ class autograder():
         if os.path.exists(logFileDest):
             os.remove(logFileDest)
         shutil.move(self.logFile, logFileDest)
+        if os.geteuid() == 0:
+            os.chown(logFileDest, normalUid, normalGid)
         print("Score: %d" % self.logPointsTotal)
         print("Wrote: %s" % logFileDest)
 
@@ -530,6 +536,20 @@ class autograder():
             
         # Copy the original submission back into the working directory
         shutil.copytree(self.directory, self.workingDirectory)
+                
+        # Make sure both the autograder UID and root can access the
+        # file. We'll make files owned by autograder and in the root
+        # group. Both with read/write (+x for directories).
+        if switchUser:
+            os.chown(self.workingDirectory, autograderUid, 0)
+            os.chmod(self.workingDirectory, 0o770)
+
+            for path, dirs, files in os.walk(self.workingDirectory):
+                os.chown(path, autograderUid, 0)
+                os.chmod(path, 0o770)
+                for f in files:
+                    os.chown(os.path.join(path,f), autograderUid, 0)
+                    os.chmod(os.path.join(path,f), stat.S_IREAD|stat.S_IWRITE|stat.S_IRGRP|stat.S_IWGRP)
 
         # Delete files we don't need in our working directory (and
         # files the students shouldn't see).
@@ -787,7 +807,11 @@ class autograder():
     def sanitize_string(self, instring, escape=True):
         """Show odd characters in hex. Performs HTML escaping"""
         if escape:
-            instring = cgi.escape(instring)
+            if "escape" in dir(cgi):  # cgi.escape() is deprecated in python 3.8
+                instring = cgi.escape(instring)
+            else:
+                instring = html.escape(instring)
+            
 
         out=""
         for i in instring:

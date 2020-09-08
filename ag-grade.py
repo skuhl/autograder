@@ -19,7 +19,7 @@ def compile_warning_errors(ag):
 
 def cppcheck(ag):
     cmd = subprocess.Popen("/usr/bin/cppcheck --std=c99 --quiet *.c",
-                           shell=True, stdout=subprocess.PIPE, 
+                           shell=True, stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE)
     (stdoutdata, stderrdata)  = cmd.communicate()
     stderrdata = stderrdata.decode('utf-8','replace')
@@ -69,7 +69,7 @@ for thisDir in dirs:
     if os.path.exists(os.path.join(thisDir, "AUTOGRADE.txt")):
         print("SKIPPING %s because it has already been autograded." % thisDir);
         continue
-    
+
     # Set up the autograder
     ag = autograder.autograder("AUTOGRADE.txt", thisDir)
 

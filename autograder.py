@@ -48,7 +48,7 @@ class config():
         else:
             print("autograde-config.json file is missing.")
             exit(1)
-        
+
 
     def get(self):
         return self.settings
@@ -290,7 +290,7 @@ class Command(object):
                 print("%s: We failed to kill thread after timeout was reached. Exiting." % self.cmdShort)
                 exit(1)
 
-            
+
         # Without this, Ctrl+C will cause python to exit---but we will
         # be forced to wait until the process we are running times out
         # too. With this, we try to exit gracefully.
@@ -298,7 +298,7 @@ class Command(object):
             os.killpg(self.process.pid, signal.SIGKILL)
             thread.join(.5)
             raise
-                
+
         return (self.didRun, self.tooSlow, self.retcode, self.stdoutdata, self.stderrdata)
 
 
@@ -306,19 +306,19 @@ class autograder():
     def __init__(self, username, totalPoints=100):
         self.lineNumber = 0
         self.logPointsTotal = totalPoints
-                
-                
+
+
         # The temporary location of the autograder report file. It
         # will be moved to the student submission directory when the
         # autograder is complete (i.e., cleanup() is called).
-        tempdir = tempfile.mkdtemp(prefix="autograder-"+username+"-")
+        self.tempdir = tempfile.mkdtemp(prefix="autograder-"+username+"-")
         if switchUser:
-            os.chown(tempdir, autograderUid, 0)
-            os.chmod(tempdir, 0o770)
-        self.logFile = os.path.join(tempdir, "report.html")
+            os.chown(self.tempdir, autograderUid, 0)
+            os.chmod(self.tempdir, 0o770)
+        self.logFile = os.path.join(self.tempdir, "report.html")
         # Prevent multiple threads from writing to log file at same time.
         self.logLock = threading.Lock()
-        
+
         # Absolute path that we need to chdir back to when finished
         self.origwd = os.getcwd() 
 
@@ -327,7 +327,7 @@ class autograder():
         self.directory = os.path.join(self.origwd, username)
 
         # The autograder will do its work in a working directory
-        self.workingDirectory = os.path.join(tempdir, "working")
+        self.workingDirectory = os.path.join(self.tempdir, "working")
         os.mkdir(self.workingDirectory)
         if switchUser:
             os.chown(self.workingDirectory, autograderUid, 0)
@@ -369,7 +369,7 @@ class autograder():
 
         self.log_addEntry("Autograder ran at: %s" % str(datetime.datetime.now().ctime()))
 
-            
+
         # Add some basic information to AUTOGRADE.html so that students
         # can figure out exactly which submission the autograder
         # graded. This data is retrieved from the AUTOGRADE.json
@@ -395,7 +395,7 @@ class autograder():
             if 'attachments' in cs and cs['attachments'] and 'late' in cs['attachments']:
                 if cs['attachments']['late'] == True:
                     self.log_addEntry("LATE: This submission was turned in late.")
-                    
+
         if 'md5sum' in metadata:
             self.log_addEntry("Submitted file had md5sum " + metadata['md5sum'])
 
@@ -436,7 +436,7 @@ class autograder():
 
         return None
 
-        
+
     def cleanup(self):
         """Remove the working directory and copy the autograde score to the original directory."""
         os.chdir(self.origwd)
@@ -491,20 +491,20 @@ class autograder():
         # Dump the metadata back out to the file.
         with open(metadataFile, "w") as f:
             json.dump(metadata, f, indent=4)
-            
+
         # Make metadata file be readable by the main user (not the temporary one we use to run submissions with).
         if switchUser and os.geteuid() == 0:
             os.chown(metadataFile, normalUid, normalGid);
             os.chown(logFileDest, normalUid, normalGid);
 
-            
+
     def skip(self):
         """Same as cleanup() but discards any autograding that may have occured---leaves the submission directory unchanged."""
         os.chdir(self.origwd)
         shutil.rmtree(self.workingDirectory)
         if os.path.exists(self.logFile):
             os.remove(self.logFile)
-            
+
     def isGraded(self):
         """Returns true if this submission needs to be autograded. A submission needs to be autograded if AUTOGRADE.json is missing, if AUTOGRADE.html is missing, or if the autograderScore is missing from AUTOGRADE.json"""
         metadataFile = os.path.join(self.directory, "AUTOGRADE.json")
@@ -521,7 +521,7 @@ class autograder():
             return False
 
         return True
-            
+
 
     def pristine(self, quiet=False):
         """Reset working directory to match the submission."""
@@ -533,10 +533,10 @@ class autograder():
             # Remove the existing working directory
             shutil.rmtree(self.workingDirectory)
 
-            
+
         # Copy the original submission back into the working directory
         shutil.copytree(self.directory, self.workingDirectory)
-                
+
         # Make sure both the autograder UID and root can access the
         # file. We'll make files owned by autograder and in the root
         # group. Both with read/write (+x for directories).
@@ -679,8 +679,8 @@ class autograder():
                     self.log_addEntry("Deleting file that should not have been present: " + str(g))
                     self.delete(g)
         return
-            
-    
+
+
     def expect_only_files(self, expected_files, deductPoints=0):
         """Identify files that the student submitted that are not in the expected_files list and deduct points for each one. Filenames can be regular expressions."""
         self.log_addEntry("Only the following files are allowed: " + str(expected_files))
@@ -700,7 +700,7 @@ class autograder():
         for f in wrongFiles:
             for g in glob.glob(f):
                 self.log_addEntry("This file shouldn't exist: \"" + g + "\"", deductPoints)
-        
+
 
     def find_unexpected_subdirectories(self, expected_dirs, deductPoints = 0):
         """Identify directories that the student submitted that are not in the expected_files list and deduct points for each one."""
@@ -718,12 +718,12 @@ class autograder():
         """Prints a preformatted message to the autogarder log. Call log_addEntryRaw() if you wish to print a full line (line number, score, in table) with preformatting."""
         self.log("<div class='preformatcode'><pre>%s</pre></div>" % self.sanitize_string(msg))
 
-            
+
     def log_lineNumber(self):
         """Prints a line number to the autogarder log."""
         self.log("<td>%d</td>" % self.lineNumber)
         self.lineNumber+=1
-            
+
 
     def log(self, msg):
         """Prints a message to the autograder log."""
@@ -767,8 +767,8 @@ class autograder():
                 self.log("</td></tr>")
             else:
                 self.log("<td>%s</td><td>%s</td></tr>" % (scoreString, msg))
-        
-            
+
+
     def log_addEntry(self, msg, deductPoints=0):
         """Appends a entry into a log file. If pointsDeducted is set, points will be removed from the students grade and mentioned in the log file."""
         self.log_generic(msg, deductPoints=deductPoints, needSanitize=True)
@@ -811,7 +811,7 @@ class autograder():
                 instring = cgi.escape(instring)
             else:
                 instring = html.escape(instring)
-            
+
 
         out=""
         for i in instring:
@@ -832,7 +832,7 @@ class autograder():
                 out += i
             else:  # nonprintable ASCII.
                 out += "\\{0x%02x}" % ord(i)  # print value in hex so it looks like: \{0x02} 
-        
+
         # We could strip whitespace, but we don't want to strip
         # whitespace from the strings that we are saying that we are
         # searching for.
@@ -904,7 +904,7 @@ class autograder():
         else:
             self.log_addEntry("%s: Program exited as expected (with exit code %d)" %
                               (exe[0],expectExitCode))
-            
+
         return (didRun, tooSlow, retcode, stdoutdata, stderrdata)
 
     def run_expectNotExitCode(self, exe, expectNotExitCode = 0, timeout=1, stdindata=None, deductTimeout=0, deductSegfault=0, deductWrongExit=0):
@@ -1053,9 +1053,9 @@ class autograder():
             self.log_addEntry("This check can produce false positives. If we made a mistake, please let us know about the problem.")
 
         return profanityCount
-                                    
-    
-                
+
+
+
     def humanSize(self, num):
         for x in ['bytes','KiB','MiB','GiB','TiB']:
             if num < 1024.0:

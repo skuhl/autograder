@@ -37,7 +37,7 @@ class bcolors:
 
 class config():
     configfile = ""
-    settings = {};
+    settings = {}
 
     def __init__(self, configfile="autograde-config.json"):
         """Load a config file, overwrite existing settings"""
@@ -122,7 +122,7 @@ class Command(object):
     def run(self, autogradeobj, timeout=5, stdindata=None, workToDoWhileRunning=None):
         def target():
 
-            #print("target %s"%str(self.cmd));
+            #print("target %s"%str(self.cmd))
             # To print current number of used processes, run: ps -eLF | grep $USER | wc -l
             os.environ["ULIMIT_NPROC"] = str(1024*4)            # Maximum number of processes
             os.environ["ULIMIT_DATA"]  = str(1024*1024*1024*8)  # 8 GB of memory
@@ -135,15 +135,15 @@ class Command(object):
 
             msg='%s: Thread started: <b>%s</b><br>' % (self.cmdShort, self.cmdSpaces)
             msg+=limitString
-            autogradeobj.log_generic(msg, deductPoints=0, needSanitize=False);
+            autogradeobj.log_generic(msg, deductPoints=0, needSanitize=False)
             startTime = time.time()
 
             try:
                 # write stderr/stdout to temp file in case students print tons of stuff out.
-                #print("mkstemp %s"%str(self.cmd));
+                #print("mkstemp %s"%str(self.cmd))
                 stdoutFile = tempfile.mkstemp(prefix="ag-"+autogradeobj.username+"-stdout-")
                 stderrFile = tempfile.mkstemp(prefix="ag-"+autogradeobj.username+"-stderr-")
-                #print("popen %s"%str(self.cmd));
+                #print("popen %s"%str(self.cmd))
 
                 # If we run the program directly, stdout and stderr
                 # messages might not be fully written out before a
@@ -151,7 +151,7 @@ class Command(object):
                 # to see what is going on. stdbuf seems to be the best
                 # way to fix this. unbuffer also works but seems to
                 # make the autograder fail to detect segfaults.
-                fixBuffering = [];
+                fixBuffering = []
                 if os.path.exists("/usr/bin/stdbuf"):
                     # Disabled stderr and stdout buffering; leave stdin buffering
                     fixBuffering = [ "/usr/bin/stdbuf", "-o0", "-e0" ]
@@ -187,19 +187,19 @@ class Command(object):
                     # No stdin provided.
                     self.process = subprocess.Popen(fixBuffering+self.cmd, stdout=stdoutFile[0], stderr=stderrFile[0], preexec_fn=self.setProcessLimits, env=my_env)
 
-                #print("wait %s"%str(self.cmd));
+                #print("wait %s"%str(self.cmd))
                 self.process.wait()
-                #print("wait after - %s"%str(self.cmd));
+                #print("wait after - %s"%str(self.cmd))
 
                 # Close the temp files we wrote to, get an
                 # (potentially abbreviated) string from the file,
                 # delete the file.
-                #print("close stdout - %s"%str(self.cmd));
+                #print("close stdout - %s"%str(self.cmd))
                 os.close(stdoutFile[0])
                 self.stdoutdata = autogradeobj.get_abbrv_string_from_file(stdoutFile[1])
                 os.unlink(stdoutFile[1])
 
-                #print("close stderr - %s"%str(self.cmd));
+                #print("close stderr - %s"%str(self.cmd))
                 os.close(stderrFile[0])
                 self.stderrdata = autogradeobj.get_abbrv_string_from_file(stderrFile[1])
                 os.unlink(stderrFile[1])
@@ -237,9 +237,9 @@ class Command(object):
                     time.sleep(.1)
                     subprocess.call(['killall', '-u', username, '-SIGKILL'])
 
-            #print("prepare thread - %s"%str(self.cmd));
+            #print("prepare thread - %s"%str(self.cmd))
             thread = threading.Thread(target=target)
-            #print("start thread - %s"%str(self.cmd));
+            #print("start thread - %s"%str(self.cmd))
 
             thread.start()
             if workToDoWhileRunning:
@@ -249,12 +249,12 @@ class Command(object):
                 # timeout mechanism won't work because we will not
                 # return from this function.
                 workToDoWhileRunning()
-            #print("join before - %s"%str(self.cmd));
+            #print("join before - %s"%str(self.cmd))
             thread.join(timeout)
-            #print("join after - %s"%str(self.cmd));
+            #print("join after - %s"%str(self.cmd))
 
             if switchUser and os.geteuid() == 0:
-                os.chown(autogradeobj.logFile, normalUid, -1);
+                os.chown(autogradeobj.logFile, normalUid, -1)
 
 
             # Check to see if we timed out
@@ -266,14 +266,14 @@ class Command(object):
                 # Try to politely kill the process
                 if self.process != None:
                     try:
-                        #print("killpg 1 - %s"%str(self.cmd));
+                        #print("killpg 1 - %s"%str(self.cmd))
                         os.killpg(self.process.pid, signal.SIGINT) # send Ctrl+C to process group
                         # self.process.send_signal(signal.SIGINT)    # send Ctrl+C to the parent process
                         time.sleep(.3)  # give process a chance to cleanup (for example valgrind printing its final summary)
-                        #print("killpg 2 - %s"%str(self.cmd));
+                        #print("killpg 2 - %s"%str(self.cmd))
                         os.killpg(self.process.pid, signal.SIGKILL) # kill the process group
                     except ProcessLookupError:
-                        # print("ProcessLookupError - %s"%str(self.cmd));
+                        # print("ProcessLookupError - %s"%str(self.cmd))
                         #
                         # ProcessLookupError occurs if the PID is
                         # already killed. This seems to happen
@@ -494,8 +494,8 @@ class autograder():
 
         # Make metadata file be readable by the main user (not the temporary one we use to run submissions with).
         if switchUser and os.geteuid() == 0:
-            os.chown(metadataFile, normalUid, normalGid);
-            os.chown(logFileDest, normalUid, normalGid);
+            os.chown(metadataFile, normalUid, normalGid)
+            os.chown(logFileDest, normalUid, normalGid)
 
 
     def skip(self):
@@ -640,7 +640,7 @@ class autograder():
         dir = os.getcwd()
         onlyExec = [ f for f in os.listdir(dir) if (os.path.isfile(os.path.join(dir,f)) and os.access(os.path.join(dir,f), os.X_OK)) ]
         onlyExec.sort()
-        return onlyExec;
+        return onlyExec
 
     def expect_file_all_of(self, filenames, deductPoints=0):
         """Returns true if all of the filenames in the list of files exists."""
@@ -654,7 +654,7 @@ class autograder():
                 self.log_addEntry("Missing a file that we expected: " + str(f), deductPoints)
                 returnVal = False
 
-        return returnVal;
+        return returnVal
 
     def expect_file_one_of(self, filenames, deductPoints=0):
         """Return true if one of the files in the filenames list of files exists."""
@@ -865,7 +865,7 @@ class autograder():
         # if we are deducting points because of the segfault/exit due
         # to signal.
         if not tooSlow and retcode < 0 and deductSegfault != 0:
-            self.log_addEntry("%s: Program exited due to a signal (segfault?)" % cmd.cmdShort, deductSegfault);
+            self.log_addEntry("%s: Program exited due to a signal (segfault?)" % cmd.cmdShort, deductSegfault)
 
         if len(stdoutdata) == 0 and len(stderrdata) == 0:
             self.log_addEntry("%s: stdout and stderr were empty." % cmd.cmdShort)
@@ -896,7 +896,7 @@ class autograder():
         # Don't deduct points for wrong exit code if we are already deducting points for segfault.
         if retcode < 0 and deductSegfault != 0 and deductWrongExit != 0:
             self.log_addEntry("%s: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit." % exe[0])
-            deductWrongExit = 0;
+            deductWrongExit = 0
 
         if retcode != expectExitCode:
             self.log_addEntry("%s: Expecting exit code %d but found %d" %
@@ -912,7 +912,7 @@ class autograder():
         (didRun, tooSlow, retcode, stdoutdata, stderrdata) = self.run(exe, timeout, stdindata, deductTimeout, deductSegfault)
         if retcode < 0 and deductSegfault != 0 and deductWrongExit != 0:
             self.log_addEntry("%s: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit." % exe[0])
-            deductWrongExit = 0;
+            deductWrongExit = 0
         if retcode == expectNotExitCode:
             self.log_addEntry("%s: Expecting an exit code that is not %d but found %d" % (exe[0], expectNotExitCode, retcode), deductWrongExit)
         else:
@@ -976,10 +976,10 @@ class autograder():
 
     def stringMustContainRegex(self, haystack, needle, pts=0):
         if re.search(needle, haystack, re.IGNORECASE):
-            self.log_addEntry("Output correctly contained: '" + needle + "' (regex)", 0);
+            self.log_addEntry("Output correctly contained: '" + needle + "' (regex)", 0)
             return True
         else:
-            self.log_addEntry("Output did not contain '" + needle + "' (regex)", pts);
+            self.log_addEntry("Output did not contain '" + needle + "' (regex)", pts)
             return False
 
     def stringMustContain(self, haystack, needle, pts=0):
@@ -1035,7 +1035,7 @@ class autograder():
         if isinstance(filenameGlobs, str):
             filenameGlobs = [ filenameGlobs ]
 
-        profanityCount = 0;
+        profanityCount = 0
         for g in filenameGlobs:
             files = glob.glob(g)
             for f in files:

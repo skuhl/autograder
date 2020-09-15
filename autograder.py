@@ -497,6 +497,10 @@ class autograder():
             os.chown(metadataFile, normalUid, normalGid)
             os.chown(logFileDest, normalUid, normalGid)
 
+        shutil.rmtree(self.tempdir)
+        self.tempdir = None
+        self.workingDirectory = None
+
 
     def skip(self):
         """Same as cleanup() but discards any autograding that may have occured---leaves the submission directory unchanged."""

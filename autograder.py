@@ -18,7 +18,7 @@ import re
 # then have the script automatically switch to a different user
 # account before running the submitted code. Changing this to True
 # also requires that you set the user ids correctly.
-switchUser=False
+switchUser=True
 
 # The id of the user that the program is normally run with. Use "id" command to retrieve these.
 normalUid=1000
@@ -96,9 +96,9 @@ class Command(object):
             if os.geteuid() == 0:
                 print("Halting. Do not run submitted programs as root.")
                 exit(1)
-                
+
         #print("post switch user")
-        
+
         #print("Preexec start")
         if os.setpgrp() == -1:  # put all processes in the same process group so we can kill it and all children it creates.
             print("Failed to set process group!")
@@ -121,7 +121,7 @@ class Command(object):
 
     def run(self, autogradeobj, timeout=5, stdindata=None, workToDoWhileRunning=None):
         def target():
-            
+
             #print("target %s"%str(self.cmd));
             # To print current number of used processes, run: ps -eLF | grep $USER | wc -l
             os.environ["ULIMIT_NPROC"] = str(1024*4)            # Maximum number of processes
@@ -168,7 +168,7 @@ class Command(object):
                 my_env = os.environ.copy()
                 my_env["GCC_COLORS"] = ""
                 my_env["TERM"]="dumb"
-                    
+
                 if stdindata:
                     self.process = subprocess.Popen(fixBuffering+self.cmd, stdin=subprocess.PIPE, stdout=stdoutFile[0], stderr=stderrFile[0], preexec_fn=self.setProcessLimits, env=my_env)
                     with autogradeobj.logLock:
@@ -190,7 +190,7 @@ class Command(object):
                 #print("wait %s"%str(self.cmd));
                 self.process.wait()
                 #print("wait after - %s"%str(self.cmd));
-                
+
                 # Close the temp files we wrote to, get an
                 # (potentially abbreviated) string from the file,
                 # delete the file.
@@ -216,7 +216,7 @@ class Command(object):
                 autogradeobj.log_addEntry('%s: Exited after %s with return code %d' % (self.cmdShort, elapsedTime, self.retcode))
 
         # END definition of target() function.
-        
+
         try:
             if switchUser==False and os.geteuid() == 0:
                 print("Don't set switchUser==False and grade student submissions as root since student submissions would be run as root.")
@@ -225,7 +225,7 @@ class Command(object):
             if switchUser==True and os.geteuid() != 0:
                 print("If switchUser==True, you should run this as root.")
                 exit(1)
-            
+
             if switchUser==True and os.geteuid() == 0:
                 # Don't kill processes if the user is intentionally running multiple processes via workToDoWhileRunning() function
                 if threading.activeCount() == 1:
@@ -240,7 +240,7 @@ class Command(object):
             #print("prepare thread - %s"%str(self.cmd));
             thread = threading.Thread(target=target)
             #print("start thread - %s"%str(self.cmd));
-            
+
             thread.start()
             if workToDoWhileRunning:
                 # time.sleep(.2) # give time for process to start.
@@ -256,7 +256,7 @@ class Command(object):
             if switchUser and os.geteuid() == 0:
                 os.chown(autogradeobj.logFile, normalUid, -1);
 
-            
+
             # Check to see if we timed out
             self.tooSlow = False
             if thread.is_alive():
@@ -320,7 +320,7 @@ class autograder():
         self.logLock = threading.Lock()
 
         # Absolute path that we need to chdir back to when finished
-        self.origwd = os.getcwd() 
+        self.origwd = os.getcwd()
 
         # Absolute path to the folder containing the student
         # submission.
@@ -338,7 +338,7 @@ class autograder():
         # directory. The only thing that needs to be copied back to
         # the original submission is the AUTOGRADE.txt file.
         self.pristine(quiet=True) ## This also cd's into self.workingDirectory
-        
+
         # Print a header for this student to the console and log file.
         print(bcolors.BOLD + username + bcolors.ENDC)
 
@@ -445,10 +445,10 @@ class autograder():
         origScore = self.logPointsTotal
         if self.logPointsTotal < 0:
             self.logPointsTotal = 0
-        
+
         # Appends the student's total score to the log file.
         self.log("<tr><td></td><td><b><span style='font-size: 140%%'>%s</span></b></td><td><b>TOTAL</b></td></tr>" % self.logPointsTotal)
-        
+
         # Since we don't actually use negative scores in grading and since students don't like to see them, we make them less noticeable.
         if origScore < 0:
             self.log_addEntry("ADJUSTMENT: Your score was adjusted from %d to %d. We don't give negative scores." % (origScore, self.logPointsTotal))
@@ -461,7 +461,7 @@ class autograder():
         self.log_addEntry("Want to talk to the grader? If you have any information that the instructor or TA should know about when grading your submission, please leave a comment on your submission in Canvas. Go to the assignment or submission page and look for a link named 'Submission details'. If you have an urgent question or find an autograder bug, email your instructor.")
 
         self.log("</table></body></html>")
-        
+
         # move autograde file to its final destination (in the
         # original directory, not the working directory)
         logFileDest = os.path.join(self.directory, "AUTOGRADE.html")
@@ -512,7 +512,7 @@ class autograder():
 
         if not os.path.exists(metadataFile) or not os.path.exists(logFile):
             return False
-        
+
         metadata = {}
         with open(metadataFile, "r") as f:
             metadata = json.load(f)
@@ -555,16 +555,16 @@ class autograder():
         # files the students shouldn't see).
         self.delete(os.path.join(self.workingDirectory, "AUTOGRADE.html"), quiet=True)
         self.delete(os.path.join(self.workingDirectory, "AUTOGRADE.json"), quiet=True)
-        
+
         # Change into the working directory again.
         os.chdir(self.workingDirectory)
-                                                    
-                                        
+
+
     def chownDir(self, path, owner, group):
         if not os.path.exists(path):
             return
-        for root, dirs, files in os.walk(path):  
-            for momo in dirs:  
+        for root, dirs, files in os.walk(path):
+            for momo in dirs:
                 os.chown(os.path.join(root, momo), owner, group)
             for momo in files:
                 os.chown(os.path.join(root, momo), owner, group)
@@ -775,8 +775,8 @@ class autograder():
 
     def log_addEntryRaw(self, msg, deductPoints=0):
         self.log_generic(msg, deductPoints=deductPoints, needSanitize=False, raw=1)
-    
-        
+
+
 
     def log_file_contents(self, filename):
         """Writes the contents of a file to the autograder log"""
@@ -788,7 +788,7 @@ class autograder():
         msg += "<div class='preformatcode'><pre>%s</pre></div>" % self.sanitize_string(self.get_abbrv_string_from_file(filename))
         self.log_generic(msg, needSanitize=False)
 
-        
+
     def find_first_matching_file(self, filenames):
         """Finds the first existing file that matches one of the filenames in the "filenames" list."""
         for f in filenames:
@@ -831,7 +831,7 @@ class autograder():
                 # copy printable strings (digits, letters, punctuation, whitespace)
                 out += i
             else:  # nonprintable ASCII.
-                out += "\\{0x%02x}" % ord(i)  # print value in hex so it looks like: \{0x02} 
+                out += "\\{0x%02x}" % ord(i)  # print value in hex so it looks like: \{0x02}
 
         # We could strip whitespace, but we don't want to strip
         # whitespace from the strings that we are saying that we are
@@ -897,7 +897,7 @@ class autograder():
         if retcode < 0 and deductSegfault != 0 and deductWrongExit != 0:
             self.log_addEntry("%s: Won't deduct points for wrong exit code when we already deducted points for abnormal program exit." % exe[0])
             deductWrongExit = 0;
-            
+
         if retcode != expectExitCode:
             self.log_addEntry("%s: Expecting exit code %d but found %d" %
                               (exe[0], expectExitCode, retcode), deductWrongExit)
@@ -1061,5 +1061,3 @@ class autograder():
             if num < 1024.0:
                 return "%d %s" % (round(num), x)
             num /= 1024.0
-
-

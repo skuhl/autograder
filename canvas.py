@@ -120,9 +120,22 @@ class canvas():
 
     def getCourses(self):
         """Gets course objects"""
-        allCourses = self.makeRequest("courses?"+
+
+        # Before Fall 2024, we could just do a single /courses call
+        # without the state option. However, now we need to explicitly
+        # ask for each state. API docs suggest we should be able to
+        # just do one request since we are a teacher.
+        unpCourses = self.makeRequest("courses?state[]=unpublished&"+
                                       urllib.parse.urlencode({"per_page":"100",
                                                               "page": "1"}))
+        avaCourses = self.makeRequest("courses?state[]=available&"+
+                                      urllib.parse.urlencode({"per_page":"100",
+                                                              "page": "1"}))
+        comCourses = self.makeRequest("courses?state[]=completed&"+
+                                      urllib.parse.urlencode({"per_page":"100",
+                                                              "page": "1"}))
+        allCourses = unpCourses+avaCourses+comCourses
+        
         #self.prettyPrint(allCourses)
 
         # Some Canvas users have courses which do not appear to be
@@ -325,7 +338,7 @@ class canvas():
         for c in courses:
             try:
                 if c['name'].lower() == searchString or \
-                str(c['id'])      == searchString:
+                   str(c['id'])      == searchString:
                     return c
             except:
                 pass
@@ -564,6 +577,15 @@ class canvas():
             with open(metadataFile,"r") as f:
                 metadataCache = json.load(f)
 
+        # Check to see if we are downloading on top of a different
+        # assignment that has already been downloaded.
+        if 'canvasSubmission' in metadataCache:
+            assign_id_cached = metadataCache['canvasSubmission']['assignment_id']
+            if assign_id_cached != submission['assignment_id']:
+                print("You are downloading submissions into a folder containing a different assignment. It is possible some downloads succeeded (shown above) if student didn't have a submission for the old assignment but do have one to download for this assignment.")
+                return
+
+            
         # Gather metadata and make assumptions if metadata file is missing:
         if "locked" not in metadataCache:
             print("%-12s Assuming cached copy is unlocked." % login)
@@ -700,25 +722,26 @@ class canvas():
                                 
                                 
     def removeDSStore(self, subdirName):
-        """Remove unnecessary Apple-related files anywhere in the subdirectory."""
+        """Remove unnecessary metadata-related files anywhere in the subdirectory."""
         for dirpath, dnames, fnames in os.walk(subdirName):
             for f in fnames:
                 fullpath = os.path.join(dirpath, f)
                 if os.path.isfile(fullpath):
                     # https://en.wikipedia.org/wiki/.DS_Store
                     # https://apple.stackexchange.com/questions/14980/
-                    if f == ".DS_Store" or f.startswith("._"):
-                        print(fullpath + " is unnecessary Apple-related file, removing")
+                    # https://stackoverflow.com/a/4496754/474549    # zone identifier
+                    if f == ".DS_Store" or f.startswith("._") or f.endswith(":Zone.Identifier"):
+                        print(fullpath + " is unnecessary metadata-related file, removing")
                         os.unlink(fullpath)
             for d in dnames:
                 fullpath = os.path.join(dirpath, d)
                 if os.path.isdir(fullpath) and d == "__MACOSX":
-                    print(fullpath + " is a Apple related folder, removing")
+                    print(fullpath + " is a metadata related folder, removing")
                     shutil.rmtree(fullpath)
             for d in dnames:
                 fullpath = os.path.join(dirpath, d)
                 if os.path.isdir(fullpath) and d.endswith(".dSYM"):
-                    print(fullpath + " is a Apple related folder, removing")
+                    print(fullpath + " is a Apple debugging symbols folder, removing")
                     shutil.rmtree(fullpath)
 
     def removeSymLinks(self, subdirName):

@@ -35,7 +35,6 @@ The first line should be the URL for the Canvas API. For Michigan Tech, for exam
     "assignmentName":"HW5: HTTP server",          // name of assignment on Canvas
     "subdirName":"autograder",                    // subdirectory to place submissions in
     "domainName":"mtu.edu",                       // domain name to use for email messages
-    "emailSubject":"HW5: autograde results",      // subject line to use for email messages
     "emailFrom":"user",                           // email address of sender
     "emailFromName":"Jane Doe",                   // name of sender
     "emailPassword":"password",                   // email password for sender

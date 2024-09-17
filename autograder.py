@@ -207,7 +207,7 @@ class Command(object):
                 self.retcode = self.process.returncode
                 self.didRun = True
             except OSError as e:
-                autogradeobj.log_addEntry("%s: Unable to start process: " % (self.cmdShort, self.cmdSpaces))
+                autogradeobj.log_addEntry("%s: Unable to start process: %s" % (self.cmdShort, self.cmdSpaces))
                 self.didRun = False
             elapsedTime = "%0.2fsec" % (time.time()-startTime)
             if self.retcode < 0:

@@ -175,7 +175,7 @@ def stats(dirs):
                 utc_dt = datetime.datetime.strptime(metadata['canvasSubmission']['submitted_at'],
                                                     '%Y-%m-%dT%H:%M:%SZ')
                 utc_dt = utc_dt.replace(tzinfo=datetime.timezone.utc)
-                timeString = canvas.canvas.prettyDate(utc_dt, datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc))
+                timeString = canvas.canvas.prettyDate(utc_dt, datetime.datetime.now(tz=datetime.timezone.utc))
 
         print("%-12s %5s %9s %9s %5d %4s %4s %5s %s" % (d, score, scoreOrig, canvasScore, attempt, late, locked, emailed, timeString))
 

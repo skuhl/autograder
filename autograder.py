@@ -363,7 +363,9 @@ class autograder():
 
         self.log("</head><body>")
         self.log("<h1>%s</h1>"%username)
-        self.log("<p><i>Gmail users:</i> This page may be easier to read if you download the file and then view it (Gmail removes some of the formatting).")
+        # Google Gmail web interface got rid of the preview option so
+        # everybody has to download the file to view it now.
+        # self.log("<p><i>Gmail users:</i> This page may be easier to read if you download the file and then view it (Gmail removes some of the formatting).")
         self.log("<table>")
         self.log("<tr><th></th><th>Points</th><th>Details</th></tr>")
 

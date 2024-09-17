@@ -506,6 +506,7 @@ class autograder():
         """Same as cleanup() but discards any autograding that may have occured---leaves the submission directory unchanged."""
         os.chdir(self.origwd)
         shutil.rmtree(self.workingDirectory)
+        shutil.rmtree(self.tempdir)
         if os.path.exists(self.logFile):
             os.remove(self.logFile)
 

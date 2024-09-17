@@ -65,9 +65,11 @@ if len(sys.argv) > 1:
 
 # For each subdirectory (i.e., student)
 for thisDir in dirs:
-    # Skip submissions that do not need regrading. All AUTOGRADE.txt files should be deleted whenever the autograder tests are changed to ensure that the new tests are applied to any already-autograded.
-    if os.path.exists(os.path.join(thisDir, "AUTOGRADE.txt")):
-        print("SKIPPING %s because it has already been autograded." % thisDir);
+
+    ag = autograder.autograder(thisDir)
+    if ag.isGraded():
+        print("SKIPPING %s because it has already been autograded." % thisDir)
+        ag.skip()
         continue
 
     # Set up the autograder

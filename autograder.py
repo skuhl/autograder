@@ -1047,7 +1047,7 @@ class autograder():
             files = glob.glob(g)
             for f in files:
                 if os.path.exists(f):
-                    with open(f, "r") as fd:
+                    with open(f, "r", errors='replace') as fd:
                         fileContents = fd.read()
                         lines = fileContents.splitlines()
                         words = [ "fuck", " shit ", "bitch", "biatch", " cunt", "damn", " ass "]

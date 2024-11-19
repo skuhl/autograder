@@ -730,7 +730,9 @@ class canvas():
                     # https://en.wikipedia.org/wiki/.DS_Store
                     # https://apple.stackexchange.com/questions/14980/
                     # https://stackoverflow.com/a/4496754/474549    # zone identifier
-                    if f == ".DS_Store" or f.startswith("._") or f.endswith(":Zone.Identifier"):
+                    # Zone.Identifier should be preceeded with a colon, but I've seen
+                    # students submit code that has a private use unicode character instead.
+                    if f == ".DS_Store" or f.startswith("._") or f.endswith("Zone.Identifier"):
                         print(fullpath + " is unnecessary metadata-related file, removing")
                         os.unlink(fullpath)
             for d in dnames:

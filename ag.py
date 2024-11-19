@@ -296,7 +296,10 @@ def emailSend(dirs):
         senderEmail = emailFrom + '@' + domainName
     emailLogin(senderEmail, emailPassword)
 
-    message = "Your autograder report is attached.\n\n"
+    message = "Your autograder report is attached. Download it and open it with your preferred web browser.\n\n"
+
+    message += "Course: %s\n" % courseName
+    message += "Assignment: %s\n" % assignmentName
 
     # count number of dirs. The 'dirs' parameter passed into this
     # function is just the directories we are supposed to send emails
